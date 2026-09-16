@@ -58,33 +58,13 @@ def distibute_particles(a1, b1, a_middle, b_middle, N):
 
     return s_a, s_b
 
-def calculate_velocity():
-    ## Распределение по энергии
-    temp_vel = np.loadtxt(filename_velocity)    
-    energy = np.linspace(0, 20, 100)
-
-    energy_interpolator = interpolate.interp1d(temp_vel[:, 0], temp_vel[:, 1], kind = 'linear', fill_value = 0, bounds_error = False)
-    nrg_distr = energy_interpolator(energy)
-    nrg_distr = nrg_distr/np.trapezoid(nrg_distr, energy)
-
-    mean_energy = np.trapezoid(nrg_distr*energy, energy)/np.trapezoid(nrg_distr, energy)
+def calculate_velocity(mean_energy, mean_angle):
+            
     speed = (2*mean_energy*qe/M)**0.5
-
-    ## Распределение по углу
-    temp_angle = np.loadtxt(filename_angle)
-    angle = np.linspace(0, 90, 100)
-
-    angle_interpolator = interpolate.interp1d(temp_angle[:, 0], temp_angle[:, 1], kind = 'linear', fill_value = 0, bounds_error = False)
-    angle_distr = angle_interpolator(angle)
-
-    angle_distr = angle_distr/np.trapezoid(angle_distr, angle)
-
-    mean_angle = np.trapezoid(angle_distr*angle, angle)/np.trapezoid(angle_distr, angle)
-
+    
     ## Назначаем скорости
     vx0 = np.zeros(N)
     
-
     vx0[:] = speed*np.abs(np.cos(np.deg2rad(mean_angle)))
     v_transverse = speed*np.abs(np.sin(np.deg2rad(mean_angle)))
     return vx0, v_transverse
@@ -200,12 +180,11 @@ def section_treater():
     only_angle_distibution = np.zeros(len(sigmas[0, :]))
     for i in range(len(sigmas[0, :])):
         only_angle_distibution[i] = np.trapezoid(sigmas[:, i], secondary_energy)
-    
 
-    plt.plot(thetas, only_angle_distibution)
-    plt.show()
-    
-    return
+    #  Находим средние значения энергии и угла
+    mean_energy = np.trapezoid(only_energy_distibution*secondary_energy, secondary_energy)/np.trapezoid(only_energy_distibution, secondary_energy)
+    mean_angle = np.trapezoid(only_angle_distibution*thetas, thetas)/np.trapezoid(only_angle_distibution, thetas)
+       
+    return mean_energy, mean_angle
 
 
-section_treater()

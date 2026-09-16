@@ -59,7 +59,8 @@ leave_neutr.direction = 1
 # k - индексация по длине
 # n - индекация по номеру частицы
 
-vx0, v_transverse = auxillary.calculate_velocity()
+mean_energy, mean_angle = auxillary.section_treater()
+vx0, v_transverse = auxillary.calculate_velocity(mean_energy, mean_angle)
 
 time_alive_overall = []
 collisions_overall = []
