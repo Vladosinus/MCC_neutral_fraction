@@ -107,7 +107,8 @@ def collision_counter(time, solutiuon):
     sign_changes = np.where(np.diff(np.sign(vz)))[0]
     num_crossings_horizontal = len(sign_changes)
     total_collisions = num_crossings_vertical + num_crossings_horizontal
-
+    plt.plot(x, y)
+    plt.show()
     return total_collisions
 
 def section_treater():
@@ -187,4 +188,12 @@ def section_treater():
        
     return mean_energy, mean_angle
 
+def diffuse_deflection():
+    # Азимутальный угол
+    azimuth = np.random.rand()*360
+
+    # Нормальный угол
+    normal = np.random.rand()*180
+    
+    return azimuth, normal
 

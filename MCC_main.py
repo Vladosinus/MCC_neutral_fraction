@@ -30,17 +30,35 @@ def moving(t, vars):
     # y[5] - это скорость (vz)
 
     ## Обработка столкновений
-    # Левая стенка и Правая стенка
-    state_vertical = (vars[2] >= a/2 or vars[2] <= -a/2)
-    state_horizontal = (vars[4] <= -b/2 or vars[4] >= b/2)
 
-    if state_vertical:
+# Левая стенка
+    if vars[2] <= -a/2:
+        # Находим полную скорость
+        speed = (vars[1]**2 + vars[3]**2 + vars[5]**2)**0.5
+        # Сначала смотрим по нормальному углу, куда попало
+        normal = np.deg2rad(np.random.rand()*180)
+        vars[3] = -speed*np.sin(normal)
+        v_longitudinal = speed*np.cos(normal)
+        # Азимутальный
+        azimuth = np.deg2rad(np.random.rand()*360)
+        vars[1] = v_longitudinal*np.cos(azimuth)
+        vars[5] = v_longitudinal*np.sin(azimuth)
+
+    # Правая стенка
+    if vars[2] >= a/2:
         vars[3] = -vars[3]
 
-    # Нижняя стенка и Верхняя стенка
-    if state_horizontal:
+    # Нижняя стенка
+    if vars[4] <= -b/2:
         vars[5] = -vars[5]
 
+    # Верхняя стенка
+    if vars[4] >= b/2:
+            vars[5] = -vars[5]
+
+    if vars[0] <= 0:
+        vars[1] = -vars[1]
+    Сделать провека по предыдущему состоянию, вдруг частица колеблется около стенки
     # Возвращаем массив производных [dx/dt, dv/dt]
     dx_dt = vars[1]
     dvx_dt1 = 0
@@ -104,11 +122,14 @@ for k in range(len(l)):
         time_ailve_section.append(t_hit)
         collisions_section.append(collisions)
         
+        exit()
         
     time_alive_overall.append(np.mean(time_ailve_section))
     collisions_overall.append(np.mean(collisions_section))
-    print(f'Среднее время жизни частиц из сечения: {time_alive_overall[0]:1e}')
-    print(f'Среднее количество ударов о стенку частиц из сечения: {collisions_overall[0]:1f}')
+    print(f'Среднее время жизни частиц из сечения: {time_alive_overall[0]*1e6:.1f}, мкс')
+    print(f'Среднее количество ударов о стенку частиц из сечения: {collisions_overall[0]:.1f}, шт')
+    print(f'Средняя энергия вторичных частиц по распределению: {mean_energy:.1f}, эВ')
+    print(f'Средний угол вылета вторичных частиц по распределению: {mean_angle:.1f}, град')
     exit()
     
 
