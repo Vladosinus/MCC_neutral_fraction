@@ -32,8 +32,15 @@ beta = np.deg2rad(0.5) # Расходимость поперек щелей
 
 ## Параметры расчета
 N = 100 # Число модельных частиц, запускаемых из одного сечения
-
-filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_long.txt'
-filepath_short = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_short.txt'
-filename_velocity = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_energy.txt'
-filename_angle = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_angle.txt'
+place = 'ki'
+match place:
+    case 'home':
+        filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_long.txt'
+        filepath_short = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_short.txt'
+        filename_velocity = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_energy.txt'
+        filename_angle = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_angle.txt'
+    case 'KI':
+        filepath_long = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_long.txt'
+        filepath_short = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_short.txt'
+        filename_velocity = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_energy.txt'
+        filename_angle = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_angle.txt'
