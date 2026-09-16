@@ -120,23 +120,11 @@ def trace_particle(vars0, t_max):
         collisions += 1
         collision_marks.append((earliest_t, vars.copy(), earliest_idx))
 
-        # Отражение в зависимости от стенки
-        if earliest_idx == 1:      # левая стенка — диффузное рассеяние
-            speed = np.sqrt(vars[1]**2 + vars[3]**2 + vars[5]**2)
-            normal = np.deg2rad(np.random.rand()*180)
-            vars[3] = speed*np.sin(normal)          # внутрь объёма (+y)
-            v_longitudinal = speed*np.cos(normal)
-            azimuth = np.deg2rad(np.random.rand()*360)
-            vars[1] = v_longitudinal*np.cos(azimuth)
-            vars[5] = v_longitudinal*np.sin(azimuth)
-        elif earliest_idx == 2:    # правая стенка
-            vars[3] = -vars[3]
-        elif earliest_idx == 3:    # нижняя стенка
-            vars[5] = -vars[5]
-        elif earliest_idx == 4:    # верхняя стенка
-            vars[5] = -vars[5]
-        elif earliest_idx == 5:    # входное сечение
-            vars[1] = -vars[1]
+        # Диффузное отражение от всех стенок и входного сечения
+        new_v = auxillary.diffuse_reflection(vars, earliest_idx)
+        vars[1] = new_v[0]
+        vars[3] = new_v[1]
+        vars[5] = new_v[2]
 
     return t_max, collisions, np.array(t_hist), np.array(y_hist).T, collision_marks
 
@@ -148,6 +136,9 @@ vx0, v_transverse = auxillary.calculate_velocity(mean_energy, mean_angle)
 
 time_alive_overall = []
 collisions_overall = []
+# Данные по каждой частице каждого сечения (для гистограмм и сохранения)
+time_alive_per_section = []
+collisions_per_section = []
 # Потом пробегаем по всем сечениям
 for k in range(len(l)):
     # В начале каждого сечения генерируем скорости (координаты тоже хорошо бы генерировать в начале каждого сечения)
@@ -176,14 +167,26 @@ for k in range(len(l)):
         
         # # Вывод траектории частицы (проекции x-y и x-z) с отметками столкновений
         # auxillary.plot_trajectory(y_plot, collision_marks, collisions)
+    
+    # Сохраняем данные по частицам этого сечения (для гистограмм и файла)
+    time_alive_per_section.append(time_ailve_section)
+    collisions_per_section.append(collisions_section)
 
-        
     time_alive_overall.append(np.mean(time_ailve_section))
     collisions_overall.append(np.mean(collisions_section))
     # print(f'Среднее время жизни частиц из сечения: {time_alive_overall[0]*1e6:.1f}, мкс')
     # print(f'Среднее количество ударов о стенку частиц из сечения: {collisions_overall[0]:.1f}, шт')
     # print(f'Средняя энергия вторичных частиц по распределению: {mean_energy:.1f}, эВ')
     # print(f'Средний угол вылета вторичных частиц по распределению: {mean_angle:.1f}, град')
-    
+
+# Сохраняем все данные по частицам в txt-файл с пояснениями
+auxillary.save_section_data(
+    'section_data.txt',
+    l,
+    time_alive_per_section,
+    collisions_per_section)
+
+plt.plot(l, time_alive_overall)
+plt.show()
     
 
