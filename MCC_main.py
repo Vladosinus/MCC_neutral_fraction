@@ -48,7 +48,7 @@ def moving(t, vars):
     dvy_dt1 = 0
     dz_dt = vars[5]
     dvz_dt1 = 0
-    
+
     return [dx_dt, dvx_dt1, dy_dt, dvy_dt1, dz_dt, dvz_dt1]
 
 def leave_neutr(t, vars):

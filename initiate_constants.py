@@ -32,7 +32,7 @@ beta = np.deg2rad(0.5) # Расходимость поперек щелей
 
 ## Параметры расчета
 N = 100 # Число модельных частиц, запускаемых из одного сечения
-place = 'ki'
+place = 'KI'
 match place:
     case 'home':
         filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_long.txt'
