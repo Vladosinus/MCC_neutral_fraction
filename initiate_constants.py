@@ -14,7 +14,8 @@ __all__ = ['M',
            'filename_angle',
            'testprofile1',
            'testprofile2',
-           'testprofile3']
+           'testprofile3',
+           'section_amount']
 
 ## Физические
 import numpy as np
@@ -34,7 +35,8 @@ alpha = np.deg2rad(0.1) # Расходимость вдоль щелей
 beta = np.deg2rad(0.5) # Расходимость поперек щелей
 
 ## Параметры расчета
-N = 50 # Число модельных частиц, запускаемых из одного сечения
+N = 1000 # Число модельных частиц, запускаемых из одного сечения
+section_amount = 10 # Количество сечений по длине
 place = 'home'
 match place:
     case 'home':

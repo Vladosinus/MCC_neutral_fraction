@@ -8,7 +8,7 @@ import auxillary
 
 
 ## Cоздаем стартовые раcспределения координат
-l = np.linspace(0, L, 10)
+l = np.linspace(0, L, section_amount)
 particles_start_position = np.zeros((len(l), N, 2))
 for i in range(len(l)):
     a_middle, b_middle = auxillary.find_beam_profile(l[i])
@@ -172,12 +172,8 @@ for k in range(len(l)):
     time_alive_per_section.append(time_ailve_section)
     collisions_per_section.append(collisions_section)
 
-    time_alive_overall.append(np.mean(time_ailve_section))
-    collisions_overall.append(np.mean(collisions_section))
-    # print(f'Среднее время жизни частиц из сечения: {time_alive_overall[0]*1e6:.1f}, мкс')
-    # print(f'Среднее количество ударов о стенку частиц из сечения: {collisions_overall[0]:.1f}, шт')
-    # print(f'Средняя энергия вторичных частиц по распределению: {mean_energy:.1f}, эВ')
-    # print(f'Средний угол вылета вторичных частиц по распределению: {mean_angle:.1f}, град')
+    # time_alive_overall.append(np.mean(time_ailve_section))
+    # collisions_overall.append(np.mean(collisions_section))
 
 # Сохраняем все данные по частицам в txt-файл с пояснениями
 auxillary.save_section_data(
@@ -186,7 +182,5 @@ auxillary.save_section_data(
     time_alive_per_section,
     collisions_per_section)
 
-plt.plot(l, time_alive_overall)
-plt.show()
     
 
