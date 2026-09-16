@@ -107,7 +107,9 @@ def collision_counter(time, solutiuon):
     sign_changes = np.where(np.diff(np.sign(vz)))[0]
     num_crossings_horizontal = len(sign_changes)
     total_collisions = num_crossings_vertical + num_crossings_horizontal
+
     plt.plot(x, y)
+    plt.plot(x[0], y[0], 'x')
     plt.show()
     return total_collisions
 
@@ -196,4 +198,62 @@ def diffuse_deflection():
     normal = np.random.rand()*180
     
     return azimuth, normal
+
+def plot_trajectory(y_plot, collision_marks, collisions):
+    """Строит две проекции траектории частицы (x-y и x-z) с отметками
+    столкновений, разделёнными по типу стенки.
+
+    Параметры:
+        y_plot         - массив решения формы (6, M): строки [x, vx, y, vy, z, vz]
+        collision_marks - список кортежей (t, состояние, индекс_стенки), где
+                          индекс: 1 - левая (y=-a/2), 2 - правая (y=+a/2),
+                                  3 - нижняя (z=-b/2), 4 - верхняя (z=+b/2),
+                                  5 - вход (x=0)
+        collisions     - общее число столкновений (для заголовка)
+    """
+    # Разделяем точки столкновений по типу стенки
+    vert_marks = [(m[1][0], m[1][2]) for m in collision_marks if m[2] in (1, 2)]
+    horiz_marks = [(m[1][0], m[1][4]) for m in collision_marks if m[2] in (3, 4)]
+
+    # Проекция x-y
+    plt.figure()
+    plt.plot(y_plot[0], y_plot[2], '-', linewidth=1, label='траектория')
+    plt.axhline(-a/2, color='k', linestyle='--', linewidth=0.8)
+    plt.axhline(a/2, color='k', linestyle='--', linewidth=0.8)
+    plt.axvline(0, color='k', linestyle='--', linewidth=0.8)
+    plt.axvline(L, color='k', linestyle='--', linewidth=0.8)
+    if vert_marks:
+        vx_m, vy_m = zip(*vert_marks)
+        plt.plot(vx_m, vy_m, 'ms', markersize=5, label='удар о вертикальную стенку')
+    plt.plot(y_plot[0, 0], y_plot[2, 0], 'go', label='старт')
+    plt.plot(y_plot[0, -1], y_plot[2, -1], 'rx', label='финиш')
+    plt.xlabel('x, м')
+    plt.ylabel('y, м')
+    plt.title(f'Траектория частицы (проекция x-y), столкновений: {collisions}')
+    plt.legend()
+    plt.grid(True)
+
+    # Проекция x-z
+    plt.figure()
+    plt.plot(y_plot[0], y_plot[4], '-', linewidth=1, label='траектория')
+    plt.axhline(-b/2, color='k', linestyle='--', linewidth=0.8)
+    plt.axhline(b/2, color='k', linestyle='--', linewidth=0.8)
+    plt.axvline(0, color='k', linestyle='--', linewidth=0.8)
+    plt.axvline(L, color='k', linestyle='--', linewidth=0.8)
+    # Удары о вертикальные стенки (y = ±a/2) дают изломы в x-z, так как
+    # при ударе меняется и vz
+    if vert_marks:
+        vx_m, vz_m = zip(*[(m[1][0], m[1][4]) for m in collision_marks if m[2] in (1, 2)])
+        plt.plot(vx_m, vz_m, 'ms', markersize=5, label='удар о вертикальную стенку')
+    if horiz_marks:
+        hx_m, hz_m = zip(*horiz_marks)
+        plt.plot(hx_m, hz_m, 'c^', markersize=5, label='удар о горизонтальную стенку')
+    plt.plot(y_plot[0, 0], y_plot[4, 0], 'go', label='старт')
+    plt.plot(y_plot[0, -1], y_plot[4, -1], 'rx', label='финиш')
+    plt.xlabel('x, м')
+    plt.ylabel('z, м')
+    plt.title(f'Траектория частицы (проекция x-z), столкновений: {collisions}')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 

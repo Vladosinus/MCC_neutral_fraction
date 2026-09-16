@@ -35,13 +35,16 @@ beta = np.deg2rad(0.5) # Расходимость поперек щелей
 
 ## Параметры расчета
 N = 100 # Число модельных частиц, запускаемых из одного сечения
-place = 'KI'
+place = 'home'
 match place:
     case 'home':
-        filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_long.txt'
-        filepath_short = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_short.txt'
-        filename_velocity = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_energy.txt'
-        filename_angle = 'D:/PostgraduateStudy/MCC_neutral_15.09/props/profile_angle.txt'
+        filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_long.txt'
+        filepath_short = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_short.txt'
+        filename_velocity = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_energy.txt'
+        filename_angle = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_angle.txt'
+        testprofile1 = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/dissociation_50kV_theta10.txt'
+        testprofile2 = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/dissociation_50kV_theta50.txt'
+        testprofile3 = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/dissociation_50kV_theta90.txt'
     case 'KI':
         filepath_long = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_long.txt'
         filepath_short = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_short.txt'
