@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import interpolate
+from scipy.signal import savgol_filter
 import matplotlib.pyplot as plt
 
 
@@ -128,3 +129,83 @@ def collision_counter(time, solutiuon):
     total_collisions = num_crossings_vertical + num_crossings_horizontal
 
     return total_collisions
+
+def section_treater():
+    # Здесь будет найдена средняя энергия частиц и средний угол вылета, чтобы потом их отправить в calculate_velocity
+    
+    secondary_energy = np.linspace(0, 20, 100)
+    ## 10 градусов
+    theta10 = np.loadtxt(testprofile1)
+    nrg1 = theta10[:, 0]
+    sig = theta10[:, 1]
+    # Поиск дубликатов
+    unique_nrg1, indices = np.unique(nrg1, return_index=True)
+    unique_sig = sig[indices]
+    # Сглаживание
+    sig_smooth = savgol_filter(unique_sig, window_length=15, polyorder=3)
+    # Интерполяция на общую сетку
+    theta10_interpolator = interpolate.interp1d(unique_nrg1, sig_smooth, kind = 'cubic', fill_value = 0, bounds_error = False)
+    sigma10 = theta10_interpolator(secondary_energy)
+    # Артефакты после сглаживания
+    sigma10[sigma10 < 0] = 0
+
+    ## 50 градусов
+    theta50 = np.loadtxt(testprofile2)
+    nrg1 = theta50[:, 0]
+    sig = theta50[:, 1]
+    # Поиск дубликатов
+    unique_nrg1, indices = np.unique(nrg1, return_index=True)
+    unique_sig = sig[indices]
+    # Сглаживание
+    sig_smooth = savgol_filter(unique_sig, window_length=11, polyorder=3)
+    # Интерполяция на общую сетку
+    theta50_interpolator = interpolate.interp1d(unique_nrg1, sig_smooth, kind = 'cubic', fill_value = 0, bounds_error = False)
+    sigma50 = theta50_interpolator(secondary_energy)
+    # Артефакты после сглаживания
+    sigma50[sigma50 < 0] = 0
+
+    ## 90 градусов
+    theta90 = np.loadtxt(testprofile3)
+    nrg1 = theta90[:, 0]
+    sig = theta90[:, 1]
+    # Поиск дубликатов
+    unique_nrg1, indices = np.unique(nrg1, return_index=True)
+    unique_sig = sig[indices]
+    # Сглаживание
+    sig_smooth = savgol_filter(unique_sig, window_length=11, polyorder=3)
+    # Интерполяция на общую сетку
+    theta90_interpolator = interpolate.interp1d(unique_nrg1, sig_smooth, kind = 'cubic', fill_value = 0, bounds_error = False)
+    sigma90 = theta90_interpolator(secondary_energy)
+    # Артефакты после сглаживания
+    sigma90[sigma90 < 0] = 0,
+
+    ## 0 градусов
+    # Искусственно создадим такое распрееление, так как измнрить его невозможно
+    sigma0 = sigma10*1.05
+
+    thetas = [0, 10, 50, 90]
+
+    sigmas = np.column_stack((sigma0, sigma10, sigma50, sigma90))
+    
+    ## Средняя энергия
+    only_energy_distibution = np.zeros(len(sigmas[:, 0]))
+    for i in range(len(sigmas[:, 0])):
+        only_energy_distibution[i] = np.trapezoid(sigmas[i, :], thetas)
+
+    # print(len(sigmas[:, 0]))
+    # print(len(secondary_energy))
+    # exit()
+
+    ## Средний угол
+    only_angle_distibution = np.zeros(len(sigmas[0, :]))
+    for i in range(len(sigmas[0, :])):
+        only_angle_distibution[i] = np.trapezoid(sigmas[:, i], secondary_energy)
+    
+
+    plt.plot(thetas, only_angle_distibution)
+    plt.show()
+    
+    return
+
+
+section_treater()

@@ -11,7 +11,10 @@ __all__ = ['M',
            'filepath_short',
            'filepath_long',
            'filename_velocity',
-           'filename_angle']
+           'filename_angle',
+           'testprofile1',
+           'testprofile2',
+           'testprofile3']
 
 ## Физические
 import numpy as np
@@ -44,3 +47,6 @@ match place:
         filepath_short = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_short.txt'
         filename_velocity = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_energy.txt'
         filename_angle = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/profile_angle.txt'
+        testprofile1 = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/dissociation_50kV_theta10.txt'
+        testprofile2 = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/dissociation_50kV_theta50.txt'
+        testprofile3 = 'D:/PostgraduateStudy/MCC_neutral_fraction/props/dissociation_50kV_theta90.txt'
