@@ -35,9 +35,9 @@ alpha = np.deg2rad(0.1) # Расходимость вдоль щелей
 beta = np.deg2rad(0.5) # Расходимость поперек щелей
 
 ## Параметры расчета
-N = 1000 # Число модельных частиц, запускаемых из одного сечения
-section_amount = 10 # Количество сечений по длине
-place = 'home'
+N = 10 # Число модельных частиц, запускаемых из одного сечения
+section_amount = 11 # Количество сечений по длине
+place = 'KI'
 match place:
     case 'home':
         filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_long.txt'

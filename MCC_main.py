@@ -144,7 +144,7 @@ for k in range(len(l)):
     # В начале каждого сечения генерируем скорости (координаты тоже хорошо бы генерировать в начале каждого сечения)
     
     vy0, vz0 = auxillary.distribute_velocity_projections(N, v_transverse)
-    # Определяем среднее время жизни частицы в нейтрализаторе, умножаем на 3 для достоверности (из среднего угла и чисто геометрических соображений)
+    # Определяем среднее время жизни частицы в нейтрализаторе, 
     tau_analitic_mean = (L - l[k])/vx0.mean()
     # Убеждаемся, что время расчета не ноль
     if k == len(l) - 2:
@@ -156,8 +156,9 @@ for k in range(len(l)):
     collisions_section = []
     # Сначала пробегаем по всем частицам в сечении
     for n in range(N):
+
         vars0 = [l[k], vx0[n], particles_start_position[k, n, 0], vy0[n], particles_start_position[k, n, 1], vz0[n]]
-        
+        # Умножаем на 20 для достоверности
         t_max = 20*tau_analitic_mean
         t_leave, collisions, t_plot, y_plot, collision_marks = trace_particle(vars0, t_max)
         

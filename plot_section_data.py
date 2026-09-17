@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 FILEPATH = 'section_data.txt'
 
 # Номера сечений, для которых строятся гистограммы (индексы из файла)
-SELECTED_SECTIONS = [0, 5]
+SELECTED_SECTIONS = [5]
 
 # Число бинов для гистограмм
 BINS = 30
