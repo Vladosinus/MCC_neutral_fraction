@@ -166,7 +166,7 @@ def section_treater():
     #  Находим средние значения энергии и угла
     mean_energy = np.trapezoid(only_energy_distibution*secondary_energy, secondary_energy)/np.trapezoid(only_energy_distibution, secondary_energy)
     mean_angle = np.trapezoid(only_angle_distibution*thetas, thetas)/np.trapezoid(only_angle_distibution, thetas)
-       
+
     return mean_energy, mean_angle
 
 def plot_trajectory(y_plot, collision_marks, collisions):
