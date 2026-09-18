@@ -2,10 +2,29 @@ from matplotlib.pylab import rand
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.integrate import solve_ivp
+import os
+import shutil
+from pathlib import Path
 
 from initiate_constants import *
 import auxillary
 
+# Путь для сохранения файла
+savename = f'mean_vals.txt'
+savepath = './output/'
+savefilepath = savepath + savename
+
+# Удаляем файл, если существует, чтобы всякого не случилось
+if os.path.exists(savefilepath):
+    # Текущая папка
+    base_dir = Path(__file__).resolve().parent
+    # Откуда и куда
+    src = base_dir / 'output' / 'mean_vals.txt'
+    dst = base_dir / 'mean_vals.txt'
+    if dst.exists():
+        dst.unlink()
+    shutil.move(str(src), str(dst))
+    # os.remove(savefilepath)
 
 ## Cоздаем стартовые раcспределения координат
 l = np.linspace(0, L, section_amount)
@@ -130,7 +149,7 @@ def trace_particle(vars0, t_max):
 
 # k - индексация по длине
 # n - индекация по номеру частицы
-
+# Находим средние значения угла и энергии из распределения и назначаем стартовые скорости для частиц
 mean_energy, mean_angle = auxillary.section_treater()
 vx0, v_transverse = auxillary.calculate_velocity(mean_energy, mean_angle)
 
@@ -161,7 +180,8 @@ for k in range(len(l)):
         # Умножаем на 20 для достоверности
         t_max = 20*tau_analitic_mean
         t_leave, collisions, t_plot, y_plot, collision_marks = trace_particle(vars0, t_max)
-        
+
+        # Дописываем времена и жизни и количества соударений в пределах сечения
         time_ailve_section.append(t_leave)
         collisions_section.append(collisions)
         
@@ -170,21 +190,36 @@ for k in range(len(l)):
         # auxillary.plot_trajectory(y_plot, collision_marks, collisions)
     
     ## Отдально сохраняем для каждого сечения все данные
-    savename = f'section_data.txt'
-    savepath = './output/'
-    savefilepath = savepath + savename
-    
-    with open(savefilepath, 'w', encoding='utf-8') as f:
-        f.write(f'# section {k}\n')
-        for val in time_ailve_section:
-            f.write(f'time alive {val}\n')
-    exit()
 
-    # Сохраняем данные по частицам этого сечения (для гистограмм и файла)
+    if os.path.exists(savefilepath):
+        with open(savefilepath, 'a', encoding='utf-8') as f:
+            f.write(f'# section {k}, l = {l[k]} м\n')
+            f.write(f"{'time alive, seconds':>14} {'collisions':>12}\n")
+            # f.write(f'time alive, seconds\n')
+            for v in range(len(time_ailve_section)):
+                f.write(f'{time_ailve_section[v]:>14.3e} {collisions_section[v]:>12.1f}\n')
+            f.write(f"{'mean time alive, seconds':>20} {'mean collisions':>20}\n")        
+            f.write(f'{np.mean(time_ailve_section):>20.3e} {np.mean(collisions_section):>20}\n')
+            f.write(f'\n')
+    else:
+        with open(savefilepath, 'w', encoding='utf-8') as f:
+            f.write(f'# section {k}, l = {l[k]} м\n')
+            f.write(f"{'time alive, seconds':>14} {'collisions':>12}\n")
+            # f.write(f'time alive, seconds\n')
+            for v in range(len(time_ailve_section)):
+                f.write(f'{time_ailve_section[v]:>14.3e} {collisions_section[v]:>12.1f}\n')
+            f.write(f"{'mean time alive, seconds':>20} {'mean collisions':>20}\n")        
+            f.write(f'{np.mean(time_ailve_section):>20.3e} {np.mean(collisions_section):>20}\n')
+            f.write(f'\n')
+    # exit()
+    
+
+    # Сохраняем данные по частицам этого сечения (для гистограмм и файла),
+    # внутри переменной набор (количество равно числу сечений) массивов, в котором лежат параметры каждой частицы внутри сечения
     time_alive_per_section.append(time_ailve_section)
     collisions_per_section.append(collisions_section)
-
-    # time_alive_overall.append(np.mean(time_ailve_section))
+    
+        # time_alive_overall.append(np.mean(time_ailve_section))
     # collisions_overall.append(np.mean(collisions_section))
 
 # Сохраняем все данные по частицам в txt-файл с пояснениями
