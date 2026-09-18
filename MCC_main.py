@@ -169,6 +169,17 @@ for k in range(len(l)):
         # # Вывод траектории частицы (проекции x-y и x-z) с отметками столкновений
         # auxillary.plot_trajectory(y_plot, collision_marks, collisions)
     
+    ## Отдально сохраняем для каждого сечения все данные
+    savename = f'section_data.txt'
+    savepath = './output/'
+    savefilepath = savepath + savename
+    
+    with open(savefilepath, 'w', encoding='utf-8') as f:
+        f.write(f'# section {k}\n')
+        for val in time_ailve_section:
+            f.write(f'time alive {val}\n')
+    exit()
+
     # Сохраняем данные по частицам этого сечения (для гистограмм и файла)
     time_alive_per_section.append(time_ailve_section)
     collisions_per_section.append(collisions_section)

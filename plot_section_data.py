@@ -13,6 +13,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+from initiate_constants import *
+
+
 # Путь к файлу с данными
 FILEPATH = 'section_data.txt'
 
@@ -20,7 +23,7 @@ FILEPATH = 'section_data.txt'
 SELECTED_SECTIONS = [5]
 
 # Число бинов для гистограмм
-BINS = 30
+BINS = 50
 
 
 def read_section_data(filepath):
@@ -85,60 +88,92 @@ def main():
     # Индексация по номеру сечения
     by_index = {s['index']: s for s in sections}
 
-    # Массивы средних значений по всем сечениям (для графиков от l)
-    l_all = np.array([s['x'] for s in sections])
-    mean_time_all = np.array([np.mean(s['times']) for s in sections])
-    mean_coll_all = np.array([np.mean(s['collisions']) for s in sections])
+    # # Массивы средних значений по всем сечениям (для графиков от l)
+    # l_all = np.array([s['x'] for s in sections])
+    # mean_time_all = np.array([np.mean(s['times']) for s in sections])
+    # mean_coll_all = np.array([np.mean(s['collisions']) for s in sections])
 
-    # --- Построение графиков ---
-    fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+    # # --- Построение графиков ---
+    # fig, axes = plt.subplots(2, 2, figsize=(13, 9))
 
-    # 1) Гистограмма времени жизни для выбранных сечений
-    ax = axes[0, 0]
-    for idx in SELECTED_SECTIONS:
-        if idx in by_index:
-            s = by_index[idx]
-            ax.hist(s['times']*1e3, bins=BINS, alpha=0.6,
-                    edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
-    ax.set_xlabel('Время жизни, мс')
-    ax.set_ylabel('Число частиц')
-    ax.set_title('Гистограмма времени жизни')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # # 1) Гистограмма времени жизни для выбранных сечений
+    # ax = axes[0, 0]
+    # for idx in SELECTED_SECTIONS:
+    #     if idx in by_index:
+    #         s = by_index[idx]
+    #         ax.hist(s['times']*1e3, bins=BINS, alpha=0.6,
+    #                 edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
+    # ax.set_xlabel('Время жизни, мс')
+    # ax.set_ylabel('Число частиц')
+    # ax.set_title('Гистограмма времени жизни')
+    # ax.legend()
+    # ax.grid(True, alpha=0.3)
 
-    # 2) Гистограмма числа столкновений для выбранных сечений
-    ax = axes[0, 1]
-    for idx in SELECTED_SECTIONS:
-        if idx in by_index:
-            s = by_index[idx]
-            ax.hist(s['collisions'], bins=BINS, alpha=0.6,
-                    edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
-    ax.set_xlabel('Число столкновений со стенкой, шт')
-    ax.set_ylabel('Число частиц')
-    ax.set_title('Гистограмма числа столкновений')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # # 2) Гистограмма числа столкновений для выбранных сечений
+    # ax = axes[0, 1]
+    # for idx in SELECTED_SECTIONS:
+    #     if idx in by_index:
+    #         s = by_index[idx]
+    #         ax.hist(s['collisions'], bins=BINS, alpha=0.6,
+    #                 edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
+    # ax.set_xlabel('Число столкновений со стенкой, шт')
+    # ax.set_ylabel('Число частиц')
+    # ax.set_title('Гистограмма числа столкновений')
+    # ax.legend()
+    # ax.grid(True, alpha=0.3)
 
-    # 3) Среднее время жизни в зависимости от координаты сечения
-    ax = axes[1, 0]
-    ax.plot(l_all, mean_time_all*1e3, 'o-', color='tab:blue')
-    ax.set_xlabel('Координата сечения l, м')
-    ax.set_ylabel('Среднее время жизни, мс')
-    ax.set_title('Среднее время жизни по сечениям')
-    ax.grid(True, alpha=0.3)
+    # # 3) Среднее время жизни в зависимости от координаты сечения
+    # ax = axes[1, 0]
+    # ax.plot(l_all, mean_time_all*1e3, 'o-', color='tab:blue')
+    # ax.set_xlabel('Координата сечения l, м')
+    # ax.set_ylabel('Среднее время жизни, мс')
+    # ax.set_title('Среднее время жизни по сечениям')
+    # ax.grid(True, alpha=0.3)
 
-    # 4) Среднее число столкновений в зависимости от координаты сечения
-    ax = axes[1, 1]
-    ax.plot(l_all, mean_coll_all, 's-', color='tab:red')
-    ax.set_xlabel('Координата сечения l, м')
-    ax.set_ylabel('Среднее число столкновений, шт')
-    ax.set_title('Среднее число столкновений по сечениям')
-    ax.grid(True, alpha=0.3)
+    # # 4) Среднее число столкновений в зависимости от координаты сечения
+    # ax = axes[1, 1]
+    # ax.plot(l_all, mean_coll_all, 's-', color='tab:red')
+    # ax.set_xlabel('Координата сечения l, м')
+    # ax.set_ylabel('Среднее число столкновений, шт')
+    # ax.set_title('Среднее число столкновений по сечениям')
+    # ax.grid(True, alpha=0.3)
 
-    fig.suptitle('Анализ данных по сечениям нейтрализатора')
-    plt.tight_layout()
-    plt.show()
+    # fig.suptitle('Анализ данных по сечениям нейтрализатора')
+    # plt.tight_layout()
+    # plt.show()
+    # exit()
 
+    figures = {}
+    axes = {}
+    fontdict_labels = {'fontsize':26,
+                'fontfamily': 'Times New Roman'}
+    fontdict_ticks = {'fontsize':24,
+                    'fontfamily': 'Times New Roman'}
+    fontdict_title = {'fontsize':28,
+                    'fontfamily': 'Times New Roman'}
+
+    idx = np.ceil(section_amount/2)-1
+
+    for image_idx in range(1, 5):
+        
+        figures[f'fig_{image_idx}'] = plt.figure(figsize=(13, 9))
+        
+        axes[f'ax_{image_idx}'] = figures[f'fig_{image_idx}'].add_subplot(111)
+    from matplotlib.ticker import FuncFormatter
+    # 1) Гистограмма времени жизни
+    s = by_index[idx]
+    axes[f'ax_{1}'].hist(s['times']*1e3, bins=BINS, alpha=0.6,
+            edgecolor='black')
+    axes[f'ax_{1}'].set_xlabel('Время жизни, мс', fontdict_labels)
+    axes[f'ax_{1}'].set_ylabel('Число частиц', fontdict_labels)
+    axes[f'ax_{1}'].set_title(f'Координата по нейтрализатору = {s['x']} м', fontdict_title)
+    axes[f'ax_{1}'].grid(True, alpha=0.3)
+    xticks = axes[f'ax_{1}'].get_xticks()
+    axes[f'ax_{1}'].set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
+    yticks = axes[f'ax_{1}'].get_yticks()
+    axes[f'ax_{1}'].set_yticklabels([f'{t:.1f}' for t in yticks], fontdict = fontdict_ticks)
+    figures[f'fig_{1}'].show()
+    input()
 
 if __name__ == '__main__':
     main()
