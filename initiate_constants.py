@@ -15,7 +15,9 @@ __all__ = ['M',
            'testprofile1',
            'testprofile2',
            'testprofile3',
-           'section_amount']
+           'section_amount',
+           'use_multiprocessing',
+           'n_workers']
 
 ## Физические
 import numpy as np
@@ -32,11 +34,16 @@ b1 = 0.35
 
 ## Параметры пучка
 alpha = np.deg2rad(0.1) # Расходимость вдоль щелей
-beta = np.deg2rad(0.5) # Расходимость поперек щелей
+beta = np.deg2rad(2) # Расходимость поперек щелей
 
 ## Параметры расчета
-N = 10 # Число модельных частиц, запускаемых из одного сечения
-section_amount = 3 + 1 # Количество сечений по длине
+N = 10000 # Число модельных частиц, запускаемых из одного сечения
+section_amount = 20 # Количество сечений по длине
+
+## Параметры распараллеливания
+use_multiprocessing = True # Включить распараллеливание трассировки частиц
+n_workers = 0 # Число рабочих процессов (0 — использовать os.cpu_count())
+
 place = 'home'
 match place:
     case 'home':
