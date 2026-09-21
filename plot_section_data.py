@@ -20,7 +20,8 @@ import os
 import re
 import numpy as np
 import matplotlib.pyplot as plt
-
+from matplotlib.colors import to_rgb, to_hex
+from scipy.optimize import curve_fit
 
 from initiate_constants import *
 
@@ -48,7 +49,7 @@ def find_data_file(candidates=None):
 SELECTED_SECTIONS = [0]
 
 # Число бинов для гистограмм
-BINS = 30
+BINS = 80
 
 
 def read_section_data(filepath):
@@ -161,55 +162,181 @@ def main():
     mean_time_all = np.array([np.mean(s['times']) for s in sections])
     mean_coll_all = np.array([np.mean(s['collisions']) for s in sections])
 
-    # --- Построение графиков ---
-    fig, axes = plt.subplots(2, 2, figsize=(13, 9))
+    # # --- Построение графиков ---
+    # fig, axes = plt.subplots(2, 2, figsize=(13, 9))
 
-    # 1) Гистограмма времени жизни для выбранных сечений
-    ax = axes[0, 0]
-    for idx in SELECTED_SECTIONS:
-        if idx in by_index:
-            s = by_index[idx]
-            ax.hist(s['times']*1e3, bins=BINS, alpha=0.6,
-                    edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
-    ax.set_xlabel('Время жизни, мс')
-    ax.set_ylabel('Число частиц')
-    ax.set_title('Гистограмма времени жизни')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # # 1) Гистограмма времени жизни для выбранных сечений
+    # ax = axes[0, 0]
+    # for idx in SELECTED_SECTIONS:
+    #     if idx in by_index:
+    #         s = by_index[idx]
+    #         ax.hist(s['times']*1e3, bins=BINS, alpha=0.6,
+    #                 edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
+    # ax.set_xlabel('Время жизни, мс')
+    # ax.set_ylabel('Число частиц')
+    # ax.set_title('Гистограмма времени жизни')
+    # ax.legend()
+    # ax.grid(True, alpha=0.3)
 
-    # 2) Гистограмма числа столкновений для выбранных сечений
-    ax = axes[0, 1]
-    for idx in SELECTED_SECTIONS:
-        if idx in by_index:
-            s = by_index[idx]
-            ax.hist(s['collisions'], bins=BINS, alpha=0.6,
-                    edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
-    ax.set_xlabel('Число столкновений со стенкой, шт')
-    ax.set_ylabel('Число частиц')
-    ax.set_title('Гистограмма числа столкновений')
-    ax.legend()
-    ax.grid(True, alpha=0.3)
+    # # 2) Гистограмма числа столкновений для выбранных сечений
+    # ax = axes[0, 1]
+    # for idx in SELECTED_SECTIONS:
+    #     if idx in by_index:
+    #         s = by_index[idx]
+    #         ax.hist(s['collisions'], bins=BINS, alpha=0.6,
+    #                 edgecolor='black', label=f'сечение {idx} (x={s["x"]:.3g} м)')
+    # ax.set_xlabel('Число столкновений со стенкой, шт')
+    # ax.set_ylabel('Число частиц')
+    # ax.set_title('Гистограмма числа столкновений')
+    # ax.legend()
+    # ax.grid(True, alpha=0.3)
 
-    # 3) Среднее время жизни в зависимости от координаты сечения
-    ax = axes[1, 0]
-    ax.plot(l_all, mean_time_all*1e3, 'o-', color='tab:blue')
-    ax.set_xlabel('Координата сечения l, м')
-    ax.set_ylabel('Среднее время жизни, мс')
-    ax.set_title('Среднее время жизни по сечениям')
-    ax.grid(True, alpha=0.3)
+    # # 3) Среднее время жизни в зависимости от координаты сечения
+    # ax = axes[1, 0]
+    # ax.plot(l_all, mean_time_all*1e3, 'o-', color='tab:blue')
+    # ax.set_xlabel('Координата сечения l, м')
+    # ax.set_ylabel('Среднее время жизни, мс')
+    # ax.set_title('Среднее время жизни по сечениям')
+    # ax.grid(True, alpha=0.3)
 
-    # 4) Среднее число столкновений в зависимости от координаты сечения
-    ax = axes[1, 1]
-    ax.plot(l_all, mean_coll_all, 's-', color='tab:red')
-    ax.set_xlabel('Координата сечения l, м')
-    ax.set_ylabel('Среднее число столкновений, шт')
-    ax.set_title('Среднее число столкновений по сечениям')
-    ax.grid(True, alpha=0.3)
+    # # 4) Среднее число столкновений в зависимости от координаты сечения
+    # ax = axes[1, 1]
+    # ax.plot(l_all, mean_coll_all, 's-', color='tab:red')
+    # ax.set_xlabel('Координата сечения l, м')
+    # ax.set_ylabel('Среднее число столкновений, шт')
+    # ax.set_title('Среднее число столкновений по сечениям')
+    # ax.grid(True, alpha=0.3)
 
-    fig.suptitle('Анализ данных по сечениям нейтрализатора')
-    plt.tight_layout()
-    plt.show()
+    # fig.suptitle('Анализ данных по сечениям нейтрализатора')
+    # plt.tight_layout()
+    # plt.show()
 
+    figures = {}
+    axes = {}
+    fontdict_labels = {'fontsize':26,
+                'fontfamily': 'Times New Roman'}
+    fontdict_ticks = {'fontsize':24,
+                    'fontfamily': 'Times New Roman'}
+    fontdict_title = {'fontsize':28,
+                    'fontfamily': 'Times New Roman'}
+
+    idx = 0#np.ceil(section_amount/2)
+
+    for image_idx in range(1, 5):
+        figures[f'fig_{image_idx}'] = plt.figure(figsize=(13, 9))
+        axes[f'ax_{image_idx}'] = figures[f'fig_{image_idx}'].add_subplot(111)
+
+    
+    # alpha_color = '#000080'
+    # alpha = 0.6
+    # background = '#ffffff'
+    # alpha_color = np.array(to_rgb(alpha_color))
+    # background = np.array(to_rgb(background))
+    # color = (alpha_color - (1 - alpha) * background) / alpha
+    # color =  to_hex(np.clip(color, 0, 1))
+    # alpha_hex = f'{int(round(alpha * 255)):02X}'
+    # color = color + alpha_hex
+
+    hist_color = '#3E3EB0'
+    line_color_exp = "#C4293B"
+    line_color_poly = "#2DC37D"
+
+    plt.rcParams['mathtext.fontset'] = 'stix'
+
+    # 1) Гистограмма времени жизни
+    s = by_index[idx]    
+    
+    # Достаем из гистограммы данные для графика
+    counts, bin_edges, patches = axes[f'ax_{1}'].hist(s['times']*1e3, bins=BINS, color = hist_color, alpha = 1,
+                edgecolor='black', linewidth = 2)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:])/2
+
+    # Подбираем экспоненциальную зависимость
+    def model(x, a, b, c):
+        return a * np.exp(-b * x) + c
+    popt, pcov = curve_fit(model, bin_centers, counts, p0=[1, 0.1, 0])
+    a, b, c = popt
+    y_fit_exp= model(bin_centers, *popt)
+
+    # Подборка полинома
+    coeffs = np.polyfit(bin_centers, counts, 4)
+    y_fit_poly = np.polyval(coeffs, bin_centers)
+    
+    # Строим гистограмму
+    axes[f'ax_{1}'].hist(s['times']*1e3, bins=BINS, color = hist_color, alpha = 1,
+                edgecolor='black', linewidth = 2)
+    # Строим линию
+    axes[f'ax_{1}'].plot(bin_centers, y_fit_exp, color = line_color_exp, linewidth = 5, label = f'y = {a:.1f} · exp(-{b:.1f} · x)'
+                                                                                                f"{'+' if c > 0 else ''}"
+                                                                                                f'{c:.1f}')
+
+    axes[f'ax_{1}'].plot(bin_centers, y_fit_poly, color = line_color_poly, linewidth = 5, label = f'y = {coeffs[0]:.1f}·' r'$x^4$'
+                                                                                                        f"{'+' if coeffs[1] > 0 else ''}" f'{coeffs[1]:.1f}' r'$x^3$'
+                                                                                                        f"{'+' if coeffs[2] > 0 else ''}" f'{coeffs[2]:.1f}' r'$x^2$'
+                                                                                                        f"{'+' if coeffs[3] > 0 else ''}" f'{coeffs[3]:.1f}x'
+                                                                                                        f"{'+' if coeffs[4] > 0 else ''}" f'{coeffs[4]:.1f}')
+    axes[f'ax_{1}'].legend(loc='upper right', prop={'family': 'Times New Roman', 'size': 24, 'style': 'italic'})
+    axes[f'ax_{1}'].set_xlabel('Время жизни, мс', fontdict_labels)
+    axes[f'ax_{1}'].set_ylabel('Число частиц, шт', fontdict_labels)
+    axes[f'ax_{1}'].set_title(f'Координата по нейтрализатору = {s['x']:.1f} м', fontdict_title)
+    axes[f'ax_{1}'].grid(True, alpha=0.3)
+    # axes[f'ax_{1}'].set_facecolor(background)
+    xticks = axes[f'ax_{1}'].get_xticks()
+    axes[f'ax_{1}'].set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
+    yticks = axes[f'ax_{1}'].get_yticks()
+    axes[f'ax_{1}'].set_yticklabels([f'{t}' for t in yticks], fontdict = fontdict_ticks)
+    figures[f'fig_{1}'].show()
+    input()
+
+    # 2) Гистограмма столкноений
+    s = by_index[idx]
+    
+    # Достаем из гистограммы данные для графика
+    counts, bin_edges, patches = axes[f'ax_{1}'].hist(s['collisions']*1e3, bins=BINS, color = hist_color, alpha = 1,
+                edgecolor='black', linewidth = 2)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:])/2
+
+    # Подбираем экспоненциальную зависимость
+    def model(x, a, b, c):
+        return a * np.exp(-b * x) + c
+    popt, pcov = curve_fit(model, bin_centers, counts, p0=[1, 0.1, 0])
+    a, b, c = popt
+    y_fit_exp= model(bin_centers, *popt)
+
+    # Подборка полинома
+    coeffs = np.polyfit(bin_centers, counts, 4)
+    y_fit_poly = np.polyval(coeffs, bin_centers)
+    
+    # Строим гистограмму
+    axes[f'ax_{1}'].hist(s['times']*1e3, bins=BINS, color = hist_color, alpha = 1,
+                edgecolor='black', linewidth = 2)
+    # Строим линию
+    axes[f'ax_{1}'].plot(bin_centers, y_fit_exp, color = line_color_exp, linewidth = 5, label = f'y = {a:.1f} · exp(-{b:.1f} · x)'
+                                                                                                f"{'+' if c > 0 else ''}"
+                                                                                                f'{c:.1f}')
+
+    axes[f'ax_{1}'].plot(bin_centers, y_fit_poly, color = line_color_poly, linewidth = 5, label = f'y = {coeffs[0]:.1f}·' r'$x^4$'
+                                                                                                        f"{'+' if coeffs[1] > 0 else ''}" f'{coeffs[1]:.1f}' r'$x^3$'
+                                                                                                        f"{'+' if coeffs[2] > 0 else ''}" f'{coeffs[2]:.1f}' r'$x^2$'
+                                                                                                        f"{'+' if coeffs[3] > 0 else ''}" f'{coeffs[3]:.1f}x'
+                                                                                                        f"{'+' if coeffs[4] > 0 else ''}" f'{coeffs[4]:.1f}')
+    axes[f'ax_{1}'].legend(loc='upper right', prop={'family': 'Times New Roman', 'size': 24, 'style': 'italic'})
+    axes[f'ax_{1}'].set_xlabel('Время жизни, мс', fontdict_labels)
+    axes[f'ax_{1}'].set_ylabel('Число частиц, шт', fontdict_labels)
+    axes[f'ax_{1}'].set_title(f'Координата по нейтрализатору = {s['x']:.1f} м', fontdict_title)
+    axes[f'ax_{1}'].grid(True, alpha=0.3)
+    # axes[f'ax_{1}'].set_facecolor(background)
+    xticks = axes[f'ax_{1}'].get_xticks()
+    axes[f'ax_{1}'].set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
+    yticks = axes[f'ax_{1}'].get_yticks()
+    axes[f'ax_{1}'].set_yticklabels([f'{t}' for t in yticks], fontdict = fontdict_ticks)
+    figures[f'fig_{1}'].show()
+    input()
+        
+
+
+
+    
 
 if __name__ == '__main__':
     main()
