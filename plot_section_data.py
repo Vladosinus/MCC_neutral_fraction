@@ -312,12 +312,12 @@ def main():
             y_fit_poly = np.polyval(coeffs, bin_centers)
             
             # Строим гистограмму
-            axes[f'ax_{graph}'].hist(s['times'], bins=BINS, color = hist_color, alpha = 1,
+            axes[f'ax_{graph}'].hist(s['collisions'], bins=BINS, color = hist_color, alpha = 1,
                         edgecolor='black', linewidth = 2)
             # Строим линию
-            # axes[f'ax_{graph}'].plot(bin_centers, y_fit_exp, color = line_color_exp, linewidth = 5, label = f'y = {a:.1e} · exp(-{b:.1e} · x)'
-            #                                                                                             f"{'+' if c > 0 else ''}"
-            #                                                                                             f'{c:.1e}')
+            axes[f'ax_{graph}'].plot(bin_centers, y_fit_exp, color = line_color_exp, linewidth = 5, label = f'y = {a:.1e} · exp(-{b:.1e} · x)'
+                                                                                                        f"{'+' if c > 0 else ''}"
+                                                                                                        f'{c:.1e}')
 
             axes[f'ax_{graph}'].plot(bin_centers, y_fit_poly, color = line_color_poly, linewidth = 5, label = f'y = {coeffs[0]:.1e}·' r'$x^4$'
                                                                                                                 f"{'+' if coeffs[1] > 0 else ''}" f'{coeffs[1]:.1e}' r'$x^3$'
@@ -363,7 +363,7 @@ def main():
             axes[f'ax_{graph}'].plot(l_all, mean_time_all*1e3, linewidth = 3, color=time_color)
             
             axes[f'ax_{graph}'].set_ylabel('Среднее время жизни, мс', fontdict = fontdict_labels_left_y)
-            axes[f'ax_{graph}'].set_ylim([0, 0.5])
+            axes[f'ax_{graph}'].set_ylim([0, 1])
             yticks = axes[f'ax_{graph}'].get_yticks()
             axes[f'ax_{graph}'].set_yticklabels([f'{t:.1f}' for t in yticks], fontdict = fontdict_ticks_left_y)
 
@@ -381,11 +381,11 @@ def main():
             yticks = ax2.get_yticks()
             ax2.set_yticklabels([f'{t:.0f}' for t in yticks], fontdict = fontdict_ticks_right_y)
                         
-            figures[f'fig_{graph}'].show()
-
-
-            
+            figures[f'fig_{graph}'].show()            
             input()
+            
+            print(f'Среднее время жизни по всему нейтрализатору: {mean_time_all.mean()*1e3} мс')
+            print(f'Среднее время жизни по всему нейтрализатору: {mean_coll_all.mean()} штук')
 
     
         
