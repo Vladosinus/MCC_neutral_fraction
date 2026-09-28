@@ -73,7 +73,7 @@ hit_top.direction = 1
 def hit_entrance(t, vars):
     return vars[0]
 hit_entrance.terminal = True
-hit_entrance.direction = -1
+hit_entrance.direction = -2
 
 
 def trace_particle(vars0, t_max, collect_trajectory=True):
