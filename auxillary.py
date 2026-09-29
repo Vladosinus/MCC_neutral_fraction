@@ -6,57 +6,32 @@ import matplotlib.pyplot as plt
 
 from initiate_constants import *
 
+# Определяет ширину пучка в зависимости от расстояния по нейтрализатору, как функция заданной расходимости
 def find_beam_profile(l):
     a2 = 2*l*np.tan(alpha) + a1
     b2 = 2*l*np.tan(beta) + b1
     return a2, b2
 
-def distibute_particles(a1, b1, a_middle, b_middle, N):
-    stretching_koef_a = a_middle/a1
+def distribute_particles(a1, a2, b1, b2, N, seed = 6428452):
+    # Распределяет N частиц в прямоугольнике a1-a2, b1-b2
     
-    # Короткая сторона
-    x_a = np.linspace(-a1/2, a1/2, 100)
-    temp_a = np.loadtxt(filepath_short)
-    temp_a[0] = -a1/2
-    temp_a[-1] = a1/2
-    density_a = interpolate.interp1d(temp_a[:, 0], temp_a[:, 1], kind = 'linear', bounds_error = False, fill_value = 0)
-    y_a = density_a(x_a)
-    y_a = y_a / np.trapezoid(y_a, x_a)
-    x_a = x_a*stretching_koef_a
-
-    cdf = np.zeros_like(x_a)
-    for i in range(1, len(x_a)):
-        cdf[i] = cdf[i-1] + np.trapezoid(y_a[i-1:i+1], x_a[i-1:i+1])
-    cdf = cdf / cdf[-1]
+    # Зерно ГСЧ, фиксируем внутри функции, чтобы была повторяемость результат
     
-    cdf_inverse = interpolate.interp1d(cdf, x_a, kind='linear', bounds_error=False, fill_value='extrapolate')
-    rng = np.random.default_rng(seed=42)
-    u_a = rng.random(N)
-    s_a = cdf_inverse(u_a)
 
-
-    # Длинная сторона
-    stretching_koef_b = b_middle/b1
-    x_b = np.linspace(-b1/2, b1/2, 100)
-    temp_b = np.loadtxt(filepath_long)
-    temp_b[0] = -b1/2
-    temp_b[-1] = b1/2
-    density_b = interpolate.interp1d(temp_b[:, 0], temp_b[:, 1], kind = 'linear', bounds_error = False, fill_value = 0)
-    y_b = density_b(x_b)
-    y_b = y_b / np.trapezoid(y_b, x_b)
-    x_b = x_b*stretching_koef_b
-
-    cdf = np.zeros_like(x_b)
-    for i in range(1, len(x_b)):
-        cdf[i] = cdf[i-1] + np.trapezoid(y_b[i-1:i+1], x_b[i-1:i+1])
-    cdf = cdf / cdf[-1]
-    from scipy.interpolate import interp1d
-    cdf_inverse = interp1d(cdf, x_b, kind='linear', bounds_error=False, fill_value='extrapolate')
-    rng = np.random.default_rng(seed=42)
-    u_b = rng.random(N)
-    s_b = cdf_inverse(u_b)
-
-    return s_a, s_b
+    s_a = []
+    s_b = []
+    
+    rng = np.random.default_rng(seed)
+    for i in range(N):
+        horzc = rng.uniform(a1, a2 + 1e-15)
+        vertc = rng.uniform(b1, b2 + 1e-15)
+        s_a.append(horzc)
+        s_b.append(vertc)
+        
+    ## На выходе нужно получить s_a и s_b - массивы соответствующих координат, длина равна количесву частиц
+    # Это нужно, чтобы не переписывать остальное, но, скорее всего, придется, так как теперь запуск частиц будет из каждой ячейки
+    
+    return np.column_stack((s_a, s_b))
 
 def calculate_velocity(mean_energy, mean_angle):
             
@@ -69,13 +44,13 @@ def calculate_velocity(mean_energy, mean_angle):
     v_transverse = speed*np.abs(np.sin(np.deg2rad(mean_angle)))
     return vx0, v_transverse
 
-def distribute_velocity_projections(N, v_transverse):
+def distribute_velocity_projections(N, v_transverse, seed = 57857685683):
 
     vy0 = np.zeros(N)
     vz0 = np.zeros(N)
-    
+    rng = np.random.default_rng(seed)
     for n in range(N):
-        gamma = np.random.rand()*360
+        gamma = round(rng.uniform(0, 1), 4)*360
         if gamma >= 0 and gamma < 90:
             vy0[n] = v_transverse*np.abs(np.cos(np.deg2rad(gamma)))
             vz0[n] = -v_transverse*np.abs(np.sin(np.deg2rad(gamma)))
@@ -88,9 +63,8 @@ def distribute_velocity_projections(N, v_transverse):
         elif gamma >= 270 and gamma < 360:
             vy0[n] = v_transverse*np.abs(np.cos(np.deg2rad(gamma)))
             vz0[n] = v_transverse*np.abs(np.sin(np.deg2rad(gamma)))
-
-    
-    return vy0, vz0
+ 
+    return np.column_stack((vy0, vz0))
 
 def section_treater():
     # Здесь будет найдена средняя энергия частиц и средний угол вылета, чтобы потом их отправить в calculate_velocity

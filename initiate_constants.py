@@ -37,14 +37,14 @@ alpha = np.deg2rad(0.1) # Расходимость вдоль щелей
 beta = np.deg2rad(2) # Расходимость поперек щелей
 
 ## Параметры расчета
-N = 10000 # Число модельных частиц, запускаемых из одного сечения
+N = 100 # Число модельных частиц, запускаемых из одного сечения
 section_amount = 20 # Количество сечений по длине
 
 ## Параметры распараллеливания
 use_multiprocessing = True # Включить распараллеливание трассировки частиц
 n_workers = 0 # Число рабочих процессов (0 — использовать os.cpu_count())
 
-place = 'home'
+place = 'KI'
 match place:
     case 'home':
         filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_long.txt'

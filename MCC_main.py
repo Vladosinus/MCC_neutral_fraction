@@ -6,6 +6,7 @@ import os
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+import time
 
 from initiate_constants import *
 import auxillary
@@ -73,7 +74,7 @@ hit_top.direction = 1
 def hit_entrance(t, vars):
     return vars[0]
 hit_entrance.terminal = True
-hit_entrance.direction = -2
+hit_entrance.direction = -1
 
 
 def trace_particle(vars0, t_max, collect_trajectory=True):
@@ -141,6 +142,70 @@ def trace_particle(vars0, t_max, collect_trajectory=True):
 
     return t_max, collisions, np.array(t_hist), np.array(y_hist).T, collision_marks
 
+
+
+
+# def trace_particles_batch(tasks, executor=None, workers=1):
+#     """Трассирует набор частиц.
+
+#     tasks    - список кортежей (vars0, t_max, seed)
+#     executor - ProcessPoolExecutor для параллельного расчёта; если None,
+#                расчёт идёт последовательно в текущем процессе
+#     workers  - число рабочих процессов (нужно для оценки chunksize)
+
+#     Возвращает список (t_leave, collisions)."""
+#     if executor is None:
+#         return [_trace_particle_task(task) for task in tasks]
+#     # chunksize снижает накладные расходы на передачу задач между процессами
+#     chunksize = max(1, len(tasks)//(workers*4))
+#     return list(executor.map(_trace_particle_task, tasks, chunksize=chunksize))
+
+
+# def _write_section_stats(k, l_k, time_ailve_section, collisions_section):
+#     """Дописывает в mean_vals.txt времена жизни и числа столкновений всех
+#     частиц сечения, а также их средние значения."""
+#     mode = 'a' if os.path.exists(savefilepath) else 'w'
+#     with open(savefilepath, mode, encoding='utf-8') as f:
+#         f.write(f'# section {k}, l = {l_k} м\n')
+#         f.write(f"{'time alive, seconds':>14} {'collisions':>12}\n")
+#         for v in range(len(time_ailve_section)):
+#             f.write(f'{time_ailve_section[v]:>14.3e} {collisions_section[v]:>12.1f}\n')
+#         f.write(f"{'mean time alive, seconds':>20} {'mean collisions':>20}\n")
+#         f.write(f'{np.mean(time_ailve_section):>20.3e} {np.mean(collisions_section):>20}\n')
+#         f.write(f'\n')
+#     print(f'Сечение номер {k}')
+
+
+# def _start_positions_task(args):
+
+#     a_current, a_currenth, b_current, b_currenth, N = args
+#     """Задача для пула процессов: стартовые координаты частиц в сечении.
+    
+#     Функции auxillary.find_beam_profile и auxillary.distibute_particles
+#     детерминированы (фиксированное зерно внутри), поэтому результат не
+#     зависит от того, в каком процессе задача выполнена."""
+#     s_a, s_b = auxillary.distibute_particles(a_current, a_currenth, b_current, b_currenth, N)
+#     return s_a, s_b
+
+
+
+def _distribute_particles(task):
+    """
+    Задача для пула: одна ячейка.
+    task = (i, j, a1, a2, b1, b2, N, seed_seq)
+    Возвращает (i, j, positions) — позиции формы (N, 2).
+    """
+    i, j, a1, a2, b1, b2, N, seed_seq = task
+    positions = auxillary.distribute_particles(a1, a2, b1, b2, N, seed_seq)
+    return i, j, positions
+
+def _distribute_velocity(tasks):
+
+    i, j, N, v_transverse, child_seeds = tasks
+    velocities = auxillary.distribute_velocity_projections(N, v_transverse, child_seeds)
+
+    return i, j, velocities
+
 def _trace_particle_task(task):
     """Задача для пула процессов: трассировка одной частицы.
 
@@ -154,47 +219,11 @@ def _trace_particle_task(task):
     return t_leave, collisions
 
 
-def trace_particles_batch(tasks, executor=None, workers=1):
-    """Трассирует набор частиц.
-
-    tasks    - список кортежей (vars0, t_max, seed)
-    executor - ProcessPoolExecutor для параллельного расчёта; если None,
-               расчёт идёт последовательно в текущем процессе
-    workers  - число рабочих процессов (нужно для оценки chunksize)
-
-    Возвращает список (t_leave, collisions)."""
-    if executor is None:
-        return [_trace_particle_task(task) for task in tasks]
-    # chunksize снижает накладные расходы на передачу задач между процессами
-    chunksize = max(1, len(tasks)//(workers*4))
-    return list(executor.map(_trace_particle_task, tasks, chunksize=chunksize))
-
-
-def _write_section_stats(k, l_k, time_ailve_section, collisions_section):
-    """Дописывает в mean_vals.txt времена жизни и числа столкновений всех
-    частиц сечения, а также их средние значения."""
-    mode = 'a' if os.path.exists(savefilepath) else 'w'
-    with open(savefilepath, mode, encoding='utf-8') as f:
-        f.write(f'# section {k}, l = {l_k} м\n')
-        f.write(f"{'time alive, seconds':>14} {'collisions':>12}\n")
-        for v in range(len(time_ailve_section)):
-            f.write(f'{time_ailve_section[v]:>14.3e} {collisions_section[v]:>12.1f}\n')
-        f.write(f"{'mean time alive, seconds':>20} {'mean collisions':>20}\n")
-        f.write(f'{np.mean(time_ailve_section):>20.3e} {np.mean(collisions_section):>20}\n')
-        f.write(f'\n')
-    print(f'Сечение номер {k}')
-
-
-def _start_positions_task(l_i):
-    """Задача для пула процессов: стартовые координаты частиц в сечении.
-
-    Функции auxillary.find_beam_profile и auxillary.distibute_particles
-    детерминированы (фиксированное зерно внутри), поэтому результат не
-    зависит от того, в каком процессе задача выполнена."""
-    a_middle, b_middle = auxillary.find_beam_profile(l_i)
-    s_a, s_b = auxillary.distibute_particles(a1, b1, a_middle, b_middle, N)
-    return s_a, s_b
-
+## Ввводим прямоугольную сетку, она одинаковая для каждого сечения
+a = np.linspace(-a1/2, a1/2, 100)
+b = np.linspace(-b1/2, b1/2, 100)
+ha = a[1] - a[0]
+hb = b[1] - b[0]
 
 def main():
     # Удаляем файл, если существует, чтобы всякого не случилось
@@ -217,27 +246,100 @@ def main():
         executor = ProcessPoolExecutor(max_workers=workers)
         print(f'Распараллеливание включено: {workers} процессов')
 
+    # ## Cоздаем стартовые раcспределения координат
+    l = np.linspace(0, L, section_amount)
+    
+    start_positions = np.zeros((len(a), len(b), N, 2))
+
+  # --- Корневой seed → независимые потоки для каждой ячейки ---
+    root_ss = np.random.SeedSequence(6428452)
+    n_cells = len(a) * len(b)
+    child_seeds = root_ss.spawn(n_cells)
+    
+    # --- Список задач ---
+    tasks = []
+    k = 0
+    for i in range(len(a)):
+        a_cur = a[i]
+        for j in range(len(b)):
+            b_cur = b[j]
+            tasks.append((
+                i, j,
+                a_cur, a_cur + ha,
+                b_cur, b_cur + hb,
+                N,
+                child_seeds[k],
+            ))
+            k += 1
+
+    chunksize = max(1, n_cells // (workers * 4))
+
+    for i, j, positions in executor.map(_distribute_particles, tasks, chunksize=chunksize):
+        start_positions[i, j] = positions
+
+    # Находим средние значения угла и энергии из распределения и назначаем
+    # стартовые скорости для частиц
+    mean_energy, mean_angle = auxillary.section_treater()
+
+    vx0, v_transverse = auxillary.calculate_velocity(mean_energy, mean_angle)
+
+    start_velocity = np.zeros((len(a), len(b), N, 3))
+    root_ss = np.random.SeedSequence(6428452)
+    n_cells = len(a) * len(b)
+    child_seeds = root_ss.spawn(n_cells)
+    chunksize = max(1, n_cells // (workers * 4))
+    tasks = []
+    k = 0
+    for i in range(len(a)):
+        for j in range(len(b)):
+            
+            tasks.append((
+                i, j,
+                N,
+                v_transverse,
+                child_seeds[k],
+            ))
+            k += 1
+
+    for i, j, velocities in executor.map(_distribute_velocity, tasks, chunksize=chunksize):
+        start_velocity[i, j, :, [1, 2]] = velocities.T
+    start_velocity[:, :, :, 0] = vx0
+
+    # Определяем среднее время жизни частицы в нейтрализаторе
+
+    tau_analitic_mean = (L)/vx0.mean()
+    # Убеждаемся, что время расчета не ноль
+    if k == len(l) - 2:
+        tau_analitic_mean_cache = tau_analitic_mean
+    if tau_analitic_mean == 0:
+        tau_analitic_mean = tau_analitic_mean_cache
+    t_max = 200*tau_analitic_mean
+
+    ## Теперь есть начальые распределения координат и скоростей
+
+    # Разные ячейки считаем последовательно, частицы внутри одной ячейки - параллельно
+    tasks = []
+    for n in range(N):
+        vars0 = [l[k], vx0[n], particles_start_position[k, n, 0],
+                    vy0[n], particles_start_position[k, n, 1], vz0[n]]
+        tasks.append((vars0, t_max, seed_base + k*N + n))
+
+
+
+    
+
+    chunksize = max(1, len(tasks)//(workers*4))
+    executor.map(_trace_particle_task, tasks, chunksize=chunksize)
+        
+
+
+
+
+    exit()
+
     try:
-        ## Cоздаем стартовые раcспределения координат
-        l = np.linspace(0, L, section_amount)
-        particles_start_position = np.zeros((len(l), N, 2))
-        # Сечения независимы друг от друга, поэтому стартовые распределения
-        # координат считаем параллельно
-        if executor is None:
-            positions = [_start_positions_task(l_i) for l_i in l]
-        else:
-            positions = list(executor.map(_start_positions_task, l))
-        for i in range(len(l)):
-            particles_start_position[i, :, 0] = positions[i][0][:]
-            particles_start_position[i, :, 1] = positions[i][1][:]
+        
 
-        # Находим средние значения угла и энергии из распределения и назначаем
-        # стартовые скорости для частиц
-        mean_energy, mean_angle = auxillary.section_treater()
-        vx0, v_transverse = auxillary.calculate_velocity(mean_energy, mean_angle)
-
-        time_alive_overall = []
-        collisions_overall = []
         # Данные по каждой частице каждого сечения (для гистограмм и сохранения)
         time_alive_per_section = []
         collisions_per_section = []
