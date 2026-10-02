@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgb, to_hex
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
+from scipy.integrate import solve_ivp
 
 from initiate_constants import *
 
@@ -101,24 +102,125 @@ sections = read_section_data(filepath)
 l = np.linspace(0, L, len(sections))
 drift_speed = np.zeros(len(sections)-1)
 
+# Считаем скорость дрейфа для всех сечений
 for idx in range(len(sections)-1):
     drift_speed[idx] = (L - sections[idx]['x'])/sections[idx]['mean_time']
 l1 = l[:-1]
-
-
-
-
 
 times = np.zeros(len(sections))
 for i in range(len(sections)):
     times[i] = sections[i]['mean_time']
 vx = (L - l[:-2])/times[:-2]
 
+# Так как в конце частицы свободно покидают без столкновений пока аппроксимируем линецно.
 extrapolator = interp1d(l[:-2], vx, kind = 'linear', fill_value='extrapolate', bounds_error=False)
 v_drift = extrapolator(l)
 
+## На этом этапе есть l и v_drift некоторой длины, неважно, какой
+dl = l[1] - l[0]
+# print(dl)
 D = 1/3*v_drift*a*k
 
+# print(len(D))
+
+S = np.zeros_like(l)
+S[0] = 1e15
+
+# Общая функция для расчета концентрации
+def calculate_diffusion_flow(l, D, S, type = 'gas'):
+    if type == 'gas':
+        Q = 3.3#16*1e-3*133.3
+        inflow = Q/1.38e-23/300/0.16/0.47
+        D = 183.5
+
+        def diffusion(t, n):
+            dndt = np.zeros_like(n)
+            
+            for i in range(1, len(dndt) - 1):
+                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+                dndt[i] = D*d2n_dx2
+
+            dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl
+            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
+
+            return dndt
+
+        t0 = 0
+        t_max = 5e-2
+        n_IC = np.zeros(len(l))
+        solution = solve_ivp(fun=diffusion,
+                            t_span=(t0, t_max),
+                            y0=n_IC,
+                            method='RK45')
+        
+
+    elif type == 'dissociation':
+
+        def diffusion(t, n):
+
+            dndt = np.zeros_like(l)
+
+            for i in range(1, len(dndt) - 1):
+                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+                dndt[i] = D*d2n_dx2 + S[i]
+
+            # dndt[0] = D[0]*(n[2] - 2*n[1] + n[0])/dl**2 + S[0]
+            dndt[0] = D*(n[1] - n[0])/dl**2 + S[0]
+            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2 + S[-1]
+            return dndt
+
+        t0 = 0
+        t_max = 5e-2
+        n_IC = np.zeros(len(l))
+
+        solution = solve_ivp(fun=diffusion,
+                    t_span=(t0, t_max),
+                    y0=n_IC,
+                    method='RK45')
+        
+    return solution
+
+# Функция для расчета S от пучка
+def generation_by_beam():
+
+    # Нвы выходе будем массив длиной, как количество сечений
+    return 1
+
+
+# Функция для расчета распределений
+def distributions():
+    concentration = []
+    # Цикл по сечениям
+    for idx in range(len(l)):
+        # Эти значения мы будем отправлять в считалку распределений, чтобы она думала, что мы считаем такой короткий участок
+        l2set = l[idx:]
+        D2set = D[idx:]
+        S2set = np.zeros(len(l2set))
+        S2set[0] = S[idx]
+        # Вызывем решатель
+        # solution = calculate_diffusion_flow(l2set, D2set, S2set, type = 'gas')
+        # # Массив концентраций от конкретного сечения, длиной len(l) - idx, надо в начало дописать нулей
+        # temp_n = solution.y[:, -1]
+
+
+        temp_n = np.ones(len(l2set))
+
+        _2ad = np.zeros(idx)
+
+        n_conc = np.concatenate((_2ad, temp_n))
+
+        concentration.append(n_conc)
+
+
+        
+
+        if idx == 2:
+            exit()
+    return concentration
+
+
+
+distributions()
 
 
 
@@ -131,51 +233,33 @@ D = 1/3*v_drift*a*k
 
 
 
-# plt.plot(l, vx1)
-# plt.ylim([0, 5000])
-# plt.show()
+
 
 exit()
+# Сначала считаем чистое распределение
+solution = calculate_diffusion_flow(D, type = 'gas')
+# Считаем генерацию частиц
 
+# Ситаем распределения от каждого сечения
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-l_interp = np.linspace(0, L, 200)
-
-interpolator = interp1d(l, times, kind='cubic', bounds_error=False)
-times_interp = interpolator(l_interp)
-v = (L - l_interp)/times_interp
-
-plt.plot(l_interp, v)
-plt.ylim([0, 5000])
+time = solution.t
+n = solution.y[:, -1]
+plt.plot(l, solution.y[:, -1])
 plt.show()
+print((solution.y[:, -1]).mean())
 
 
 
 
-# plt.plot(l_interp, times_interp)
-# plt.plot(l, times)
-# plt.show()
 
 
-exit()
-plt.plot(l1[:-1], sections[:-2]['mean_time'])
-plt.show()
+
+
+
+
+
+
+
+
+
+
