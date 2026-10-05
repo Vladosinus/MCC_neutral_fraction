@@ -1,6 +1,6 @@
-import os
 import re
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 from matplotlib.colors import to_rgb, to_hex
 from scipy.optimize import curve_fit
@@ -8,97 +8,11 @@ from scipy.interpolate import interp1d
 from scipy.integrate import solve_ivp
 
 from initiate_constants import *
+import auxillary_treater
 
 filepath = 'output/mean_vals.txt'
 
-def read_section_data(filepath):
-    """Читает mean_vals.txt с данными по сечениям.
-
-    Возвращает:
-        sections - список словарей вида
-                   {'index': k, 'x': x, 'times': np.array,
-                    'collisions': np.array,
-                    'mean_time': float, 'mean_collisions': float}
-
-    Формат файла (повторяется для каждого сечения):
-        # section <k>, l = <координата> м
-        time alive, seconds   collisions
-        <время частицы, с>    <столкновений частицы, шт>
-        ...
-        mean time alive, seconds      mean collisions
-        <среднее время, с>            <среднее столкновений, шт>
-    """
-    sections = []
-    current = None
-    # После заголовка "mean time alive..." идёт строка со средними значениями,
-    # её нужно сохранить отдельно, а не как ещё одну частицу.
-    expect_mean = False
-
-    section_re = re.compile(r'#\s*section\s+(\d+)\s*,\s*l\s*=\s*([-\d.eE+]+)')
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        for line in f:
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            m = section_re.match(stripped)
-            if m:
-                # Начался новый блок сечения
-                if current is not None:
-                    sections.append(current)
-                current = {
-                    'index': int(m.group(1)),
-                    'x': float(m.group(2)),
-                    'times': [],
-                    'collisions': [],
-                    'mean_time': None,
-                    'mean_collisions': None,
-                }
-                expect_mean = False
-                continue
-
-            # Прочие строки-комментарии пропускаем
-            if stripped.startswith('#'):
-                continue
-
-            if current is None:
-                continue
-
-            # Заголовок "mean time alive, seconds   mean collisions":
-            # следующая числовая строка — средние значения по сечению
-            if stripped.lower().startswith('mean'):
-                expect_mean = True
-                continue
-
-            parts = stripped.split()
-            try:
-                t = float(parts[0])
-                c = float(parts[1])
-            except (ValueError, IndexError):
-                # Строка-заголовок "time alive, seconds   collisions" и т.п.
-                continue
-
-            if expect_mean:
-                current['mean_time'] = t
-                current['mean_collisions'] = c
-                expect_mean = False
-                continue
-
-            current['times'].append(t)
-            current['collisions'].append(c)
-
-    if current is not None:
-        sections.append(current)
-
-    # Преобразуем списки в массивы
-    for s in sections:
-        s['times'] = np.array(s['times'])
-        s['collisions'] = np.array(s['collisions'])
-
-    return sections
-
-sections = read_section_data(filepath)
+sections = auxillary_treater.read_section_data(filepath)
 l = np.linspace(0, L, len(sections))
 drift_speed = np.zeros(len(sections)-1)
 
@@ -117,136 +31,54 @@ extrapolator = interp1d(l[:-2], vx, kind = 'linear', fill_value='extrapolate', b
 v_drift = extrapolator(l)
 
 ## На этом этапе есть l и v_drift некоторой длины, неважно, какой
+# Шаг вдоль нейтрализатора
 dl = l[1] - l[0]
-# print(dl)
-D = 1/3*v_drift*a*k
+# Коэффициент диффузии для частиц, образовавшихся в результате диссоциации
+D_diss = 1/3*v_drift*Dh*k
 
-# print(len(D))
+## Параметры для просто газа
 
-S = np.zeros_like(l)
-S[0] = 1e15
+# Коэффициент диффузии газа
+D_gas = 1/3*((3*kB*T/M2)**0.5)*Dh*k
+# Поток в нейтрализатор
+inflow = Q/(kB*T*a*b)
 
-# Общая функция для расчета концентрации
-def calculate_diffusion_flow(l, D, S, type = 'gas'):
-    if type == 'gas':
-        Q = 3.3#16*1e-3*133.3
-        inflow = Q/1.38e-23/300/0.16/0.47
-        D = 183.5
+# Пакуем в одну перемеенную, чтобы отправить в функцию расчета
+l2set = l
+D2set = D_gas
+S2set = 0
+vars = l2set, dl, D2set, S2set, inflow, v_drift
 
-        def diffusion(t, n):
-            dndt = np.zeros_like(n)
-            
-            for i in range(1, len(dndt) - 1):
-                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
-                dndt[i] = D*d2n_dx2
+solution = auxillary_treater.calculate_diffusion_flow(vars, type = 'gas')
+n_gas = solution.y[:, -1]
 
-            dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl
-            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
+# Сечения процессов
+generation_sigmas = auxillary_treater.load_sigmas()
 
-            return dndt
+## Считаем изменение компонентного состава пучка
+sigmas = [generation_sigmas[0][1], generation_sigmas[1][1]]
+I = auxillary_treater.beam_transform(n_gas, sigmas, L, l)
+n_beam = I/(qe*v_beam*a1*b1)
 
-        t0 = 0
-        t_max = 5e-2
-        n_IC = np.zeros(len(l))
-        solution = solve_ivp(fun=diffusion,
-                            t_span=(t0, t_max),
-                            y0=n_IC,
-                            method='RK45')
-        
-
-    elif type == 'dissociation':
-
-        def diffusion(t, n):
-
-            dndt = np.zeros_like(l)
-
-            for i in range(1, len(dndt) - 1):
-                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
-                dndt[i] = D*d2n_dx2 + S[i]
-
-            # dndt[0] = D[0]*(n[2] - 2*n[1] + n[0])/dl**2 + S[0]
-            dndt[0] = D*(n[1] - n[0])/dl**2 + S[0]
-            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2 + S[-1]
-            return dndt
-
-        t0 = 0
-        t_max = 5e-2
-        n_IC = np.zeros(len(l))
-
-        solution = solve_ivp(fun=diffusion,
-                    t_span=(t0, t_max),
-                    y0=n_IC,
-                    method='RK45')
-        
-    return solution
-
-# Функция для расчета S от пучка
-def generation_by_beam():
-
-    # Нвы выходе будем массив длиной, как количество сечений
-    return 1
-
-
-# Функция для расчета распределений
-def distributions():
-    concentration = []
-    # Цикл по сечениям
-    for idx in range(len(l)):
-        # Эти значения мы будем отправлять в считалку распределений, чтобы она думала, что мы считаем такой короткий участок
-        l2set = l[idx:]
-        D2set = D[idx:]
-        S2set = np.zeros(len(l2set))
-        S2set[0] = S[idx]
-        # Вызывем решатель
-        # solution = calculate_diffusion_flow(l2set, D2set, S2set, type = 'gas')
-        # # Массив концентраций от конкретного сечения, длиной len(l) - idx, надо в начало дописать нулей
-        # temp_n = solution.y[:, -1]
-
-
-        temp_n = np.ones(len(l2set))
-
-        _2ad = np.zeros(idx)
-
-        n_conc = np.concatenate((_2ad, temp_n))
-
-        concentration.append(n_conc)
-
-
-        
-
-        if idx == 2:
-            exit()
-    return concentration
-
-
-
-distributions()
+## Считаем генерацию частиц пучком, на выходе нужно получить объемное рождение в каждом
+# сечении по длине
+beam_properties = v_beam, n_beam
+Q = auxillary_treater.generation_by_beam(n_gas, generation_sigmas, beam_properties)
+Q_full = np.sum(Q, axis = 0)
+# Строим график
+# auxillary_treater.plot_generation(l, Q)
 
 
 
 
 
+n_atoms = auxillary_treater.distributions(l, D_diss, Q_full, inflow, v_drift)
 
-
-
-
-
-
-
-
-
-exit()
-# Сначала считаем чистое распределение
-solution = calculate_diffusion_flow(D, type = 'gas')
-# Считаем генерацию частиц
-
-# Ситаем распределения от каждого сечения
-
-time = solution.t
-n = solution.y[:, -1]
-plt.plot(l, solution.y[:, -1])
+for i in range(n_atoms.shape[0]):
+    plt.plot(l, n_atoms[i])
 plt.show()
-print((solution.y[:, -1]).mean())
+
+
 
 
 
