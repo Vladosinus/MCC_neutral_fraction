@@ -7,6 +7,14 @@ import math
 
 from initiate_constants import *
 
+# Тут строятся графики, чтобы в каждый не вписывать
+fontdict_labels = {'fontsize':26,
+                    'fontfamily': 'Times New Roman'}
+fontdict_ticks = {'fontsize':24,
+                'fontfamily': 'Times New Roman'}
+fontdict_title = {'fontsize':28,
+                'fontfamily': 'Times New Roman'}
+plt.rcParams['mathtext.fontset'] = 'stix'
 
 # Загрузка результатов Монте-Карло
 def read_section_data(filepath):
@@ -255,16 +263,7 @@ def plot_generation(l, Q):
     mantissa_str, exp_str = s.split('e')
     _y_lim_max = (math.ceil(float(mantissa_str)))*10**(float(exp_str))
 
-    fontdict_labels = {'fontsize':26,
-                    'fontfamily': 'Times New Roman'}
-    fontdict_ticks = {'fontsize':24,
-                    'fontfamily': 'Times New Roman'}
-    fontdict_title = {'fontsize':28,
-                    'fontfamily': 'Times New Roman'}
-    plt.rcParams['mathtext.fontset'] = 'stix'
-
     figure1 = plt.figure(figsize=(13, 9))
-
     ax = figure1.add_subplot()
 
     for spine in ax.spines.values():
@@ -291,12 +290,14 @@ def plot_generation(l, Q):
     for i in range(len(yticks)):
         s = f"{yticks[i]:e}"
         mantissa_str, exp_str = s.split('e')
-        if float(mantissa_str) == 0:
-            label = f'{0}'
-        # elif math.ceil(float(mantissa_str)) == float(mantissa_str):
-        #     label = fr'{float(mantissa_str):.0f} $\cdot$ $10^{{{float(exp_str):.0f}}}$'
-        else:
-            label = fr'{float(mantissa_str):.2f} $\cdot$ $10^{{{float(exp_str):.0f}}}$'
+
+        # if float(mantissa_str) == 0:
+        #     label = f'{0}'
+        # # elif math.ceil(float(mantissa_str)) == float(mantissa_str):
+        # #     label = fr'{float(mantissa_str):.0f} $\cdot$ $10^{{{float(exp_str):.0f}}}$'
+        # else:
+        #     label = fr'{float(mantissa_str):.2f}$\cdot$$10^{{{float(exp_str):.0f}}}$'
+        label = f'{float(mantissa_str)}'
         tick_labels.append(label)
         
     ax.set_yticklabels(tick_labels, fontdict = fontdict_ticks)
@@ -325,3 +326,33 @@ def distributions(l, D_diss, Q_full, inflow, v_drift):
     concentration.append(np.zeros_like(l))
 
     return np.array(concentration)
+# Функция для построение распределений атомов от пучка
+def plot_atoms_distributions(l, n_atoms):
+
+    # Распределения от отдельных сечений
+    figure1 = plt.figure(figsize=(13, 9))
+    ax1 = figure1.add_subplot()
+    for i in range(n_atoms.shape[0]):
+        for j in range(n_atoms.shape[1]):
+            if n_atoms[i][j] > 0:
+                break
+        
+        plt.plot(l[j:], n_atoms[i][j:])
+
+    ax1.set_xlabel(fr'Координата вдоль пучка, $м$', fontdict_labels)
+    ax1.grid(True)
+    ax1.set_xlim([-0.01*L, L + 0.01*L])
+    xticks = ax1.get_xticks()
+    ax1.set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
+
+
+    ax1.set_ylabel(fr'Концентрация вторичных атомов, $м^{{-3}}$', fontdict_labels)
+
+    plt.show()
+    
+    # Суммарное
+    figure2 = plt.figure(figsize=(13, 9))
+    ax2 = figure2.add_subplot()
+    plt.plot(l, n_atoms.sum(axis = 0))
+
+    plt.show()

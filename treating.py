@@ -66,17 +66,11 @@ beam_properties = v_beam, n_beam
 Q = auxillary_treater.generation_by_beam(n_gas, generation_sigmas, beam_properties)
 Q_full = np.sum(Q, axis = 0)
 # Строим график
-# auxillary_treater.plot_generation(l, Q)
-
-
-
-
-
+auxillary_treater.plot_generation(l, Q)
+# exit()
 n_atoms = auxillary_treater.distributions(l, D_diss, Q_full, inflow, v_drift)
 
-for i in range(n_atoms.shape[0]):
-    plt.plot(l, n_atoms[i])
-plt.show()
+auxillary_treater.plot_atoms_distributions(l, n_atoms)
 
 
 
