@@ -258,11 +258,7 @@ def plot_generation(l, Q):
     Q_full = np.sum(Q, axis = 0)
     _Q_max = np.max(Q_full)
 
-    # Создаем максимальное значение по y
-    s = f"{_Q_max:e}"
-    mantissa_str, exp_str = s.split('e')
-    _y_lim_max = (math.ceil(float(mantissa_str)))*10**(float(exp_str))
-
+    
     figure1 = plt.figure(figsize=(13, 9))
     ax = figure1.add_subplot()
 
@@ -283,24 +279,25 @@ def plot_generation(l, Q):
     ax.set_xlim([-0.01*L, L + 0.01*L])
     xticks = ax.get_xticks()
     ax.set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
-    ax.set_ylim([-0.01*_y_lim_max, _y_lim_max + 0.01*_y_lim_max])
-    yticks = ax.get_yticks()
-    
-    tick_labels = []
-    for i in range(len(yticks)):
-        s = f"{yticks[i]:e}"
-        mantissa_str, exp_str = s.split('e')
 
-        # if float(mantissa_str) == 0:
-        #     label = f'{0}'
-        # # elif math.ceil(float(mantissa_str)) == float(mantissa_str):
-        # #     label = fr'{float(mantissa_str):.0f} $\cdot$ $10^{{{float(exp_str):.0f}}}$'
-        # else:
-        #     label = fr'{float(mantissa_str):.2f}$\cdot$$10^{{{float(exp_str):.0f}}}$'
-        label = f'{float(mantissa_str)}'
-        tick_labels.append(label)
-        
+    # Создаем максимальное значение по y
+    s = f"{_Q_max:e}"
+    mantissa_str, exp_str = s.split('e')
+    _y_lim_max = (math.ceil(float(mantissa_str)))*10**(float(exp_str))
+
+    ax.set_ylim([-0.01*_y_lim_max, _y_lim_max + 0.01*_y_lim_max])
+
+    ticks = np.arange(0, _y_lim_max/10**float(exp_str) + _y_lim_max/10**float(exp_str)/10, _y_lim_max/10**float(exp_str)/10)
+    ax.set_yticks(ticks*10**float(exp_str))
+
+    tick_labels = np.array([f'{t:.1f}' for t in ticks])
     ax.set_yticklabels(tick_labels, fontdict = fontdict_ticks)
+
+    ax.text(-0.01, 1.02,
+            fr'$10^{{{float(exp_str):.0f}}}$',
+            fontsize = fontdict_ticks['fontsize'] + 2,
+            transform = ax.transAxes)
+
     plt.tight_layout()
     plt.show()
 # Функция для расчета распределений
@@ -339,17 +336,37 @@ def plot_atoms_distributions(l, n_atoms):
         
         plt.plot(l[j:], n_atoms[i][j:])
 
-    ax1.set_xlabel(fr'Координата вдоль пучка, $м$', fontdict_labels)
+    
     ax1.grid(True)
     ax1.set_xlim([-0.01*L, L + 0.01*L])
     xticks = ax1.get_xticks()
     ax1.set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
 
-
+    ax1.set_xlabel(fr'Координата вдоль пучка, $м$', fontdict_labels)
     ax1.set_ylabel(fr'Концентрация вторичных атомов, $м^{{-3}}$', fontdict_labels)
+    
+    # Создаем максимальное значение по y
+    s = f"{n_atoms.max().max():e}"
+    mantissa_str, exp_str = s.split('e')
+    _y_lim_max = (math.ceil(float(mantissa_str)*10)/10)*10**(float(exp_str))
+
+    ax1.set_ylim([-0.01*_y_lim_max, _y_lim_max + 0.01*_y_lim_max])
+
+    ticks = np.arange(0, _y_lim_max/10**float(exp_str) + _y_lim_max/10**float(exp_str)/10, _y_lim_max/10**float(exp_str)/10)
+    ax1.set_yticks(ticks*10**float(exp_str))
+
+    tick_labels = np.array([f'{t:.1f}' for t in ticks])
+    ax1.set_yticklabels(tick_labels, fontdict = fontdict_ticks)
+
+    ax1.text(-0.01, 1.02,
+            fr'$10^{{{float(exp_str):.0f}}}$',
+            fontsize = fontdict_ticks['fontsize'] + 2,
+            transform = ax1.transAxes)
+    
+    plt.tight_layout()
 
     plt.show()
-    
+    exit()
     # Суммарное
     figure2 = plt.figure(figsize=(13, 9))
     ax2 = figure2.add_subplot()
