@@ -4,6 +4,7 @@ from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import math
+import random
 
 from initiate_constants import *
 
@@ -326,16 +327,34 @@ def distributions(l, D_diss, Q_full, inflow, v_drift):
 # Функция для построение распределений атомов от пучка
 def plot_atoms_distributions(l, n_atoms):
 
+    # Пересчет на подробную сетку, чтобы график был красивый
+    n1 = []
+    print(n_atoms.shape[0])
+    exit()
+    l1 = np.linspace(l.min(), l.max(), 50)
+    for i in range(n_atoms.shape[0]):
+        interpolator = interp1d(l, n_atoms[i], kind = 'cubic', fill_value='extrapolate', bounds_error=False)
+        n1.append(interpolator(l1))
+    n_atoms = n1
+    l = l1
+
     # Распределения от отдельных сечений
     figure1 = plt.figure(figsize=(13, 9))
     ax1 = figure1.add_subplot()
+
+    for spine in ax1.spines.values():
+        spine.set_linewidth(2)     # толщина
+        spine.set_color('black')   # цвет
+    
     for i in range(n_atoms.shape[0]):
+
         for j in range(n_atoms.shape[1]):
             if n_atoms[i][j] > 0:
                 break
+        color_section = random.choice(plt.cm.tab20.colors)
         
-        plt.plot(l[j:], n_atoms[i][j:])
-
+        ax1.plot(l[j:], n_atoms[i][j:], color = color_section, lw = 3)
+        ax1.plot(l[j], n_atoms[i][j], '*', color = color_section, markersize = 15)
     
     ax1.grid(True)
     ax1.set_xlim([-0.01*L, L + 0.01*L])
@@ -370,6 +389,12 @@ def plot_atoms_distributions(l, n_atoms):
     # Суммарное
     figure2 = plt.figure(figsize=(13, 9))
     ax2 = figure2.add_subplot()
-    plt.plot(l, n_atoms.sum(axis = 0))
+
+    for spine in ax2.spines.values():
+        spine.set_linewidth(2)     # толщина
+        spine.set_color('black')   # цвет
+
+
+    ax2.plot(l, n_atoms.sum(axis = 0))
 
     plt.show()
