@@ -329,14 +329,7 @@ def plot_atoms_distributions(l, n_atoms):
 
     # Пересчет на подробную сетку, чтобы график был красивый
     n1 = []
-    print(n_atoms.shape[0])
-    exit()
-    l1 = np.linspace(l.min(), l.max(), 50)
-    for i in range(n_atoms.shape[0]):
-        interpolator = interp1d(l, n_atoms[i], kind = 'cubic', fill_value='extrapolate', bounds_error=False)
-        n1.append(interpolator(l1))
-    n_atoms = n1
-    l = l1
+    l_merged = []
 
     # Распределения от отдельных сечений
     figure1 = plt.figure(figsize=(13, 9))
@@ -345,16 +338,29 @@ def plot_atoms_distributions(l, n_atoms):
     for spine in ax1.spines.values():
         spine.set_linewidth(2)     # толщина
         spine.set_color('black')   # цвет
-    
-    for i in range(n_atoms.shape[0]):
 
-        for j in range(n_atoms.shape[1]):
-            if n_atoms[i][j] > 0:
+    for i in range(len(n_atoms)-2):
+
+        for j in range(len(n_atoms[i])-1):
+            if n_atoms[i][j] > n_atoms[i][j+1]:
                 break
+
+        l1 = np.linspace(l[j], l[-1], 50)
+        interpolator = interp1d(l[j:], n_atoms[i][j:], kind = 'cubic', fill_value=0, bounds_error=False)
+        n1.append(interpolator(l1))
+
+        l_merged.append(l1)
+        print(l_merged)
+
+
         color_section = random.choice(plt.cm.tab20.colors)
+        ax1.plot(l_merged[i], n1[i], color = color_section, lw = 3)
+        plt.show()
+    exit()
+
         
-        ax1.plot(l[j:], n_atoms[i][j:], color = color_section, lw = 3)
-        ax1.plot(l[j], n_atoms[i][j], '*', color = color_section, markersize = 15)
+    ax1.plot(l[j:], n_atoms[i][j:], color = color_section, lw = 3)
+    ax1.plot(l[j], n_atoms[i][j], '*', color = color_section, markersize = 15)
     
     ax1.grid(True)
     ax1.set_xlim([-0.01*L, L + 0.01*L])
@@ -365,7 +371,7 @@ def plot_atoms_distributions(l, n_atoms):
     ax1.set_ylabel(fr'Концентрация вторичных атомов, $м^{{-3}}$', fontdict_labels)
     
     # Создаем максимальное значение по y
-    s = f"{n_atoms.max().max():e}"
+    s = f"{np.max(np.max(n_atoms)):e}"
     mantissa_str, exp_str = s.split('e')
     _y_lim_max = (math.ceil(float(mantissa_str)*10)/10)*10**(float(exp_str))
 
