@@ -68,7 +68,7 @@ section_amount = 20 # Количество сечений по длине
 use_multiprocessing = True # Включить распараллеливание трассировки частиц
 n_workers = 0 # Число рабочих процессов (0 — использовать os.cpu_count())
 
-place = 'home'
+place = 'KI'
 match place:
     case 'home':
         filepath_long = 'D:/PostgraduateStudy/MCC_neutral_15.09/MCC_neutral_fraction/props/profile_long.txt'

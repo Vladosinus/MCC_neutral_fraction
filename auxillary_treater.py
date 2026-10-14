@@ -104,58 +104,7 @@ def read_section_data(filepath):
         s['collisions'] = np.array(s['collisions'])
 
     return sections
-# Общая функция для расчета концентрации
-def calculate_diffusion_flow(vars, type = 'gas'):
-    l, dl, D, S, inflow, v_drift = vars
 
-    # Просто натекание из левой границы, поток
-    if type == 'gas':
-        t_pass = L/((3*kB*T/M2)**0.5)
-        t_max = 100*t_pass
-
-        def diffusion(t, n):
-            dndt = np.zeros_like(n)
-            for i in range(1, len(dndt) - 1):
-                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
-                dndt[i] = D*d2n_dx2
-
-            dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl
-            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
-
-            return dndt
-        
-        n_IC = np.zeros(len(l))
-        solution = solve_ivp(fun=diffusion,
-                            t_span=(0, t_max),
-                            y0=n_IC,
-                            method='RK45')
-        
-    elif type == 'dissociation':
-
-        # Оценочное время прохождения частиц через нейтрализатор
-        t_pass = L/v_drift
-        t_max = 100*t_pass
-
-        def diffusion(t, n):
-
-            dndt = np.zeros_like(l)
-
-            for i in range(1, len(dndt) - 1):
-                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
-                dndt[i] = D*d2n_dx2 + S
-
-            # dndt[0] = D[0]*(n[2] - 2*n[1] + n[0])/dl**2 + S[0]
-            dndt[0] = D*(n[1] - n[0])/dl**2 + S
-            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
-            return dndt
-
-        n_IC = np.zeros(len(l))
-        solution = solve_ivp(fun=diffusion,
-                    t_span=(0, t_max),
-                    y0=n_IC,
-                    method='RK45')
-        
-    return solution
 # Общая функция для расчета генерации АТОМОВ пучком
 def generation_by_beam(n_gas, generation_sigmas, beam_properties):
     v, n_beam = beam_properties
@@ -301,6 +250,7 @@ def plot_generation(l, Q):
 
     plt.tight_layout()
     plt.show()
+
 # Функция для расчета распределений
 def distributions(l, D_diss, Q_full, inflow, v_drift):
     concentration = []
@@ -324,6 +274,90 @@ def distributions(l, D_diss, Q_full, inflow, v_drift):
     concentration.append(np.zeros_like(l))
 
     return np.array(concentration)
+
+# Общая функция для расчета концентрации
+def calculate_diffusion_flow(vars, type = 'gas'):
+    l, dl, D, S, inflow, v_drift = vars
+
+    # Просто натекание из левой границы, поток
+    if type == 'gas':
+        t_pass = L/((3*kB*T/M2)**0.5)
+        t_max = 50*t_pass
+
+        def diffusion(t, n):
+            dndt = np.zeros_like(n)
+            for i in range(1, len(dndt) - 1):
+                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+                dndt[i] = D*d2n_dx2
+
+            dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl
+            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
+
+            return dndt
+        
+        n_IC = np.zeros(len(l))
+        solution = solve_ivp(fun=diffusion,
+                            t_span=(0, t_max),
+                            y0=n_IC,
+                            method='RK45')
+        
+    elif type == 'dissociation':
+
+        # Оценочное время прохождения частиц через нейтрализатор
+        t_pass = L/v_drift
+        t_max = 100*t_pass
+
+        def diffusion(t, n):
+
+            dndt = np.zeros_like(l)
+
+            for i in range(1, len(dndt) - 1):
+                d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+                dndt[i] = D*d2n_dx2 + S
+
+            # dndt[0] = D[0]*(n[2] - 2*n[1] + n[0])/dl**2 + S[0]
+            dndt[0] = D*(n[1] - n[0])/dl**2 + S
+            dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
+            return dndt
+
+        n_IC = np.zeros(len(l))
+        solution = solve_ivp(fun=diffusion,
+                    t_span=(0, t_max),
+                    y0=n_IC,
+                    method='RK45')
+
+    return solution
+
+# Общая функция для расчета концентрации с учетом пучка
+def calculate_diffusion_flow_with_beam(vars):
+    l, dl, D, inflow, n_beam, v_beam, sigmas_beam, n_gas_prev = vars
+
+    sigma_neutr = np.sum(sigmas_beam[0][[0, 2, 3, 4, 5, 6]])
+    sigma_proton = np.sum(sigmas_beam[1][[0, 1, 2, 3]])
+
+    t_pass = L/((3*kB*T/M2)**0.5)
+    t_max = 50*t_pass
+
+    def diffusion(t, n):
+        dndt = np.zeros_like(n)
+        for i in range(1, len(dndt) - 1):
+            depletion = - n[i]*n_beam[0][i]*v_beam*sigma_neutr - n[i]*n_beam[1][i]*v_beam*sigma_proton
+            d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+            dndt[i] = D*d2n_dx2 + depletion
+
+        dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl - n[i]*n_beam[0][i]*v_beam*sigma_neutr - n[i]*n_beam[1][i]*v_beam*sigma_proton
+        dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2 - n[i]*n_beam[0][i]*v_beam*sigma_neutr - n[i]*n_beam[1][i]*v_beam*sigma_proton
+
+        return dndt
+    
+    n_IC = np.zeros(len(n_gas_prev))#n_gas_prev
+    solution = solve_ivp(fun=diffusion,
+                        t_span=(0, t_max),
+                        y0=n_IC,
+                        method='RK45')
+        
+    return solution
+
 # Функция для построение распределений атомов от пучка
 def plot_atoms_distributions(l, n_atoms):
 
@@ -339,28 +373,21 @@ def plot_atoms_distributions(l, n_atoms):
         spine.set_linewidth(2)     # толщина
         spine.set_color('black')   # цвет
 
-    for i in range(len(n_atoms)-2):
-
+    for i in range(0, len(n_atoms), 3):
         for j in range(len(n_atoms[i])-1):
             if n_atoms[i][j] > n_atoms[i][j+1]:
                 break
 
         l1 = np.linspace(l[j], l[-1], 50)
-        interpolator = interp1d(l[j:], n_atoms[i][j:], kind = 'cubic', fill_value=0, bounds_error=False)
+        interpolator = interp1d(l[j:], n_atoms[i][j:], kind = 'linear', fill_value=0, bounds_error=False)
         n1.append(interpolator(l1))
 
         l_merged.append(l1)
-        print(l_merged)
-
-
-        color_section = random.choice(plt.cm.tab20.colors)
-        ax1.plot(l_merged[i], n1[i], color = color_section, lw = 3)
-        plt.show()
-    exit()
-
         
-    ax1.plot(l[j:], n_atoms[i][j:], color = color_section, lw = 3)
-    ax1.plot(l[j], n_atoms[i][j], '*', color = color_section, markersize = 15)
+    for i in range(len(l_merged)):
+        color_section = '#000080'#random.choice(plt.cm.tab20.colors)
+        ax1.plot(l_merged[i], n1[i], color = color_section, lw = 3)
+        ax1.plot(l_merged[i][0], n1[i][0], '*', color = color_section, markersize = 15)
     
     ax1.grid(True)
     ax1.set_xlim([-0.01*L, L + 0.01*L])
@@ -391,7 +418,7 @@ def plot_atoms_distributions(l, n_atoms):
     plt.tight_layout()
 
     plt.show()
-    exit()
+    
     # Суммарное
     figure2 = plt.figure(figsize=(13, 9))
     ax2 = figure2.add_subplot()
@@ -401,6 +428,34 @@ def plot_atoms_distributions(l, n_atoms):
         spine.set_color('black')   # цвет
 
 
-    ax2.plot(l, n_atoms.sum(axis = 0))
+    l1 = np.linspace(0, l[-1], 50)
+    sum_interpolator = interp1d(l, n_atoms.sum(axis = 0), fill_value = 0, bounds_error=False, kind = 'cubic')
+    n_sum = sum_interpolator(l1)
 
+    ax2.plot(l1, n_sum, color = '#000080', lw = 3)
+
+    s = f"{np.max(n_atoms.sum(axis = 0)):e}"
+    mantissa_str, exp_str = s.split('e')
+    _y_lim_max = (math.ceil(float(mantissa_str)*10)/10)*10**(float(exp_str))
+    
+    ax2.grid(True)
+    ax2.set_xlim([-0.01*L, L + 0.01*L])
+    xticks = ax2.get_xticks()
+    ax2.set_xticklabels([f'{t:.1f}' for t in xticks], fontdict = fontdict_ticks)
+
+    ax2.set_xlabel(fr'Координата вдоль пучка, $м$', fontdict_labels)
+    ax2.set_ylabel(fr'Концентрация вторичных атомов, $м^{{-3}}$', fontdict_labels)
+
+    ticks = np.arange(0, _y_lim_max/10**float(exp_str) + _y_lim_max/10**float(exp_str)/10, _y_lim_max/10**float(exp_str)/10)
+    ax2.set_yticks(ticks*10**float(exp_str))
+
+    tick_labels = np.array([f'{t:.1f}' for t in ticks])
+    ax2.set_yticklabels(tick_labels, fontdict = fontdict_ticks)
+    ax2.set_ylim([-0.01*_y_lim_max, _y_lim_max + 0.01*_y_lim_max])
+    ax2.text(-0.01, 1.02,
+            fr'$10^{{{float(exp_str):.0f}}}$',
+            fontsize = fontdict_ticks['fontsize'] + 2,
+            transform = ax2.transAxes)
+
+    plt.tight_layout()
     plt.show()
