@@ -1,5 +1,5 @@
-from concurrent.futures.process import _threads_wakeups
-
+# from concurrent.futures.process import _threads_wakeups
+import multiprocessing as mp
 import numpy as np
 import os
 from concurrent.futures import ProcessPoolExecutor
@@ -267,7 +267,7 @@ hit_entrance.direction = -1
 def _trace_pool(args):
     i, j, n, N, x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current, t_max = args
     # Начальные условия
-    vars0 = [0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current]
+    vars0 = [x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current]
     
     # Ивенты
     events = [leave_neutr, hit_left, hit_right, hit_bottom, hit_top, hit_entrance]
@@ -279,10 +279,10 @@ def _trace_pool(args):
     # Координаты и прочее для столкновений
     collision_marks = []
     # Заготовки под накопление траектории
-    t_hist = [0]
+    t_history = [0]
     
-    x_hist = [vars0[0]]
-    y_hist = [vars0[2]]
+    prop_history = [np.array(vars0).copy()]
+    
     
     # Так как используем ивенты, будем много перезапускать
     while t0 < t_max:
@@ -293,16 +293,17 @@ def _trace_pool(args):
                             y0 = vars0,
                             method = 'RK45',
                             events = events,
-                            max_step = 1e-7,
+                            max_step = t_max/5,
                             rtol=1e-8, atol=1e-10)
-        
-        for i_hist in range(1, len(solution.t)):
-            x_hist.append(solution.y[0, i_hist].copy())
-            y_hist.append(solution.y[2, i_hist].copy())
-                            
+
+        for i_history in range(1, len(solution.t)):
+            t_history.append(solution.t[i_history])
+            prop_history.append(solution.y[:, i_history].copy())            
+
         # Если просто вылет из нейтрализатора
         if len(solution.t_events[0]) > 0:
-            return [np.array(x_hist), np.array(y_hist)]
+            return i, j, n, t_history, prop_history, collisions, collision_marks
+
         
         # Первое столкновение со стенкой
         # Время, когда случилось соударение
@@ -317,50 +318,62 @@ def _trace_pool(args):
                 earliest_idx = idx
 
         if earliest_idx is None:
-            # Ничего не произошло — таймаут
-            return [np.array(x_hist), np.array(y_hist)]
+            # Ничего не произошло — таймаут? за все выделенное время остался в нейтрализаторе и не ударился, а остался в воздухе висеть
+            return i, j, n, t_history, prop_history, collisions, collision_marks
 
         # Переписываем координаты, где произошло столкновение
         vars0 = solution.y_events[earliest_idx][0]
-        print(vars0)
-        exit()
         t0 = earliest_t
         collisions += 1
         collision_marks.append((earliest_t, vars0, earliest_idx))
 
         # Переписываем начальные скорости по диффузному отражению и обрабатываем возможные события
-        new_v = diffuse_reflection(vars, earliest_idx)
+        new_v = diffuse_reflection(vars0, earliest_idx)
         vars0[1] = new_v[0]
         vars0[3] = new_v[1]
         vars0[5] = new_v[2]
-
-        plt.plot(solution.y[0], solution.y[2])
-        plt.show()
-
-    return [np.array(x_hist), np.array(y_hist)]
+        print(t0)
+    return i, j, n, t_history, prop_history, collisions, collision_marks
     
 # Организатор
 def trace_particles(L, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0):
     print('Начата трассировка сечени ...')
     n_workers = os.cpu_count()
-    t_max = L/vx0*50
+    t_max = L/vx0*5
     tasks = []
     # Пул задач
     for i in range(len(a_grid)):
             for j in range(len(b_grid)):
                 for n in range(N):
                     tasks.append((i, j, n, N, 0, vx0, y_cell[i, j, n], vy0[i, j, n], z_cell[i, j, n], vz0[i, j, n], t_max))
+    chunksize = max(1, len(tasks)//(n_workers*4))
     # Сам расчет
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        results = list(executor.map(_trace_pool, tasks))
+        results = list(executor.map(_trace_pool, tasks, chunksize=chunksize))
 
-    # exit()
+    time = np.empty((len(a_grid), len(b_grid), N), dtype = object)
+    paricles_trajectoies = np.empty((len(a_grid), len(b_grid), N), dtype = object)
+
+    print(results[0])
+    for i, j, n, t_history, prop_history, collisions, collision_marks in results:
+        time[i, j, n] = np.array(t_history)
+        paricles_trajectoies[i, j, n] = np.array(prop_history)
+
+
+    print(paricles_trajectoies[0, 0, :])
+
+
+    exit()
+    x_p = np.array([arr[0] for arr in prop_history])
+    y_p = np.array([arr[2] for arr in prop_history])
+    if len(collision_marks) > 1:
+        x_marks = np.array([m[1][0] for m in collision_marks])
+        y_marks = np.array([m[1][2] for m in collision_marks])
+        print(x_marks)
+    else:
+        x_marks = collision_marks[0][1][0]
+        y_marks = collision_marks[0][1][2]
     
-    # exit()
-    
-    plt.plot(results[50][0], results[50][1])
-    # plt.plot(results[:][0, 0], results[:][1, 0], 'x')
-    plt.show()
     return 1
 
 # Правая часть

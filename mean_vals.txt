@@ -1,70 +1,140 @@
 # section 0, l = 0.0 м
 time alive, seconds   collisions
-     7.214e-05          6.0
-     5.022e-04         86.0
-     3.200e-04         46.0
-     4.636e-04         90.0
-     3.469e-04         60.0
+     2.980e-04         50.0
+     4.986e-04         76.0
 mean time alive, seconds      mean collisions
-           3.410e-04                 57.6
+           3.983e-04                 63.0
 
 # section 1, l = 0.10526315789473684 м
 time alive, seconds   collisions
-     3.917e-04         52.0
-     1.901e-04         31.0
-     5.672e-04         81.0
-     1.158e-04         17.0
-     4.855e-04         83.0
+     2.963e-04         46.0
+     4.862e-04         91.0
 mean time alive, seconds      mean collisions
-           3.501e-04                 52.8
+           3.913e-04                 68.5
 
 # section 2, l = 0.21052631578947367 м
 time alive, seconds   collisions
-     3.284e-04         42.0
-     4.682e-04         75.0
-     6.625e-05          3.0
-     9.527e-05          9.0
-     2.379e-04         38.0
+     4.237e-04         58.0
+     4.011e-04         63.0
 mean time alive, seconds      mean collisions
-           2.392e-04                 33.4
+           4.124e-04                 60.5
 
 # section 3, l = 0.3157894736842105 м
 time alive, seconds   collisions
-     1.248e-03        197.0
-     2.059e-04         37.0
-     2.217e-04         34.0
-     7.234e-04        124.0
-     3.716e-04         43.0
+     3.036e-04         44.0
+     5.349e-04         81.0
 mean time alive, seconds      mean collisions
-           5.541e-04                 87.0
+           4.193e-04                 62.5
 
 # section 4, l = 0.42105263157894735 м
 time alive, seconds   collisions
-     5.541e-04         96.0
-     1.590e-03        266.0
-     3.275e-04         56.0
-     3.287e-04         48.0
-     2.618e-04         35.0
+     9.282e-05         12.0
+     4.947e-04         83.0
 mean time alive, seconds      mean collisions
-           6.123e-04                100.2
+           2.938e-04                 47.5
 
 # section 5, l = 0.5263157894736842 м
 time alive, seconds   collisions
-     1.340e-04         17.0
-     2.967e-04         32.0
-     1.090e-04         16.0
-     4.532e-04         56.0
-     3.006e-04         43.0
+     7.914e-05          5.0
+     3.979e-04         56.0
 mean time alive, seconds      mean collisions
-           2.587e-04                 32.8
+           2.385e-04                 30.5
 
 # section 6, l = 0.631578947368421 м
 time alive, seconds   collisions
-     1.790e-04         27.0
-     9.235e-04        144.0
-     3.185e-04         53.0
-     3.089e-04         50.0
-     1.029e-04         16.0
+     1.355e-04         16.0
+     7.839e-05          9.0
 mean time alive, seconds      mean collisions
-           3.666e-04                 58.0
+           1.069e-04                 12.5
+
+# section 7, l = 0.7368421052631579 м
+time alive, seconds   collisions
+     2.269e-04         36.0
+     1.349e-03        236.0
+mean time alive, seconds      mean collisions
+           7.878e-04                136.0
+
+# section 8, l = 0.8421052631578947 м
+time alive, seconds   collisions
+     1.513e-04         23.0
+     1.994e-04         33.0
+mean time alive, seconds      mean collisions
+           1.753e-04                 28.0
+
+# section 9, l = 0.9473684210526315 м
+time alive, seconds   collisions
+     2.239e-04         36.0
+     3.303e-05          2.0
+mean time alive, seconds      mean collisions
+           1.285e-04                 19.0
+
+# section 10, l = 1.0526315789473684 м
+time alive, seconds   collisions
+     7.671e-04        138.0
+     1.466e-03        266.0
+mean time alive, seconds      mean collisions
+           1.117e-03                202.0
+
+# section 11, l = 1.1578947368421053 м
+time alive, seconds   collisions
+     1.523e-04         26.0
+     3.528e-04         48.0
+mean time alive, seconds      mean collisions
+           2.525e-04                 37.0
+
+# section 12, l = 1.263157894736842 м
+time alive, seconds   collisions
+     5.785e-05          7.0
+     7.991e-05         11.0
+mean time alive, seconds      mean collisions
+           6.888e-05                  9.0
+
+# section 13, l = 1.3684210526315788 м
+time alive, seconds   collisions
+     2.333e-05          1.0
+     9.100e-05         16.0
+mean time alive, seconds      mean collisions
+           5.716e-05                  8.5
+
+# section 14, l = 1.4736842105263157 м
+time alive, seconds   collisions
+     4.910e-04         56.0
+     2.940e-04         41.0
+mean time alive, seconds      mean collisions
+           3.925e-04                 48.5
+
+# section 15, l = 1.5789473684210527 м
+time alive, seconds   collisions
+     7.086e-04        102.0
+     9.436e-04        144.0
+mean time alive, seconds      mean collisions
+           8.261e-04                123.0
+
+# section 16, l = 1.6842105263157894 м
+time alive, seconds   collisions
+     1.941e-05          3.0
+     1.883e-04         33.0
+mean time alive, seconds      mean collisions
+           1.038e-04                 18.0
+
+# section 17, l = 1.789473684210526 м
+time alive, seconds   collisions
+     1.557e-05          3.0
+     8.291e-06          1.0
+mean time alive, seconds      mean collisions
+           1.193e-05                  2.0
+
+# section 18, l = 1.894736842105263 м
+time alive, seconds   collisions
+     3.761e-06          0.0
+     1.222e-05          3.0
+mean time alive, seconds      mean collisions
+           7.989e-06                  1.5
+
+# section 19, l = 2.0 м
+time alive, seconds   collisions
+     0.000e+00          0.0
+     0.000e+00          0.0
+mean time alive, seconds      mean collisions
+           0.000e+00                  0.0
 
