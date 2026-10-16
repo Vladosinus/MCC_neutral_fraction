@@ -265,6 +265,7 @@ hit_entrance.direction = -1
 # ------------------------------------
 # Генератор заданий
 def _trace_pool(args):
+
     i, j, n, N, x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current, t_max = args
     # Начальные условия
     vars0 = [x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current]
@@ -279,8 +280,7 @@ def _trace_pool(args):
     # Координаты и прочее для столкновений
     collision_marks = []
     # Заготовки под накопление траектории
-    t_history = [0]
-    
+    t_history = [0]    
     prop_history = [np.array(vars0).copy()]
     
     
@@ -296,15 +296,15 @@ def _trace_pool(args):
                             max_step = t_max/5,
                             rtol=1e-8, atol=1e-10)
 
+        # Накапливаетс ятраектория
         for i_history in range(1, len(solution.t)):
             t_history.append(solution.t[i_history])
             prop_history.append(solution.y[:, i_history].copy())            
 
         # Если просто вылет из нейтрализатора
         if len(solution.t_events[0]) > 0:
-            return i, j, n, t_history, prop_history, collisions, collision_marks
+            return i, j, n, np.array(t_history), prop_history, collisions, collision_marks
 
-        
         # Первое столкновение со стенкой
         # Время, когда случилось соударение
         earliest_t = None
@@ -319,7 +319,7 @@ def _trace_pool(args):
 
         if earliest_idx is None:
             # Ничего не произошло — таймаут? за все выделенное время остался в нейтрализаторе и не ударился, а остался в воздухе висеть
-            return i, j, n, t_history, prop_history, collisions, collision_marks
+            return i, j, n, np.array(t_history), prop_history, collisions, collision_marks
 
         # Переписываем координаты, где произошло столкновение
         vars0 = solution.y_events[earliest_idx][0]
@@ -327,13 +327,15 @@ def _trace_pool(args):
         collisions += 1
         collision_marks.append((earliest_t, vars0, earliest_idx))
 
+        # Здесь надо считать рекомбинацию на стенке
+
         # Переписываем начальные скорости по диффузному отражению и обрабатываем возможные события
         new_v = diffuse_reflection(vars0, earliest_idx)
         vars0[1] = new_v[0]
         vars0[3] = new_v[1]
         vars0[5] = new_v[2]
-        print(t0)
-    return i, j, n, t_history, prop_history, collisions, collision_marks
+        
+    return i, j, n, np.array(t_history), prop_history, collisions, collision_marks
     
 # Организатор
 def trace_particles(L, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0):
@@ -351,30 +353,20 @@ def trace_particles(L, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0):
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         results = list(executor.map(_trace_pool, tasks, chunksize=chunksize))
 
+    # Подготовка переменных под распаковку результата
     time = np.empty((len(a_grid), len(b_grid), N), dtype = object)
-    paricles_trajectoies = np.empty((len(a_grid), len(b_grid), N), dtype = object)
+    particles_trajectoies = np.empty((len(a_grid), len(b_grid), N), dtype = object)
+    collisions_count = np.zeros((len(a_grid), len(b_grid), N))
+    collision_points = np.empty((len(a_grid), len(b_grid), N), dtype = object)
 
-    print(results[0])
+    # Распаковка результата
     for i, j, n, t_history, prop_history, collisions, collision_marks in results:
         time[i, j, n] = np.array(t_history)
-        paricles_trajectoies[i, j, n] = np.array(prop_history)
-
-
-    print(paricles_trajectoies[0, 0, :])
-
-
-    exit()
-    x_p = np.array([arr[0] for arr in prop_history])
-    y_p = np.array([arr[2] for arr in prop_history])
-    if len(collision_marks) > 1:
-        x_marks = np.array([m[1][0] for m in collision_marks])
-        y_marks = np.array([m[1][2] for m in collision_marks])
-        print(x_marks)
-    else:
-        x_marks = collision_marks[0][1][0]
-        y_marks = collision_marks[0][1][2]
+        particles_trajectoies[i, j, n] = np.array(prop_history)
+        collisions_count[i, j, n] = collisions
+        collision_points[i, j, n] = collision_marks
     
-    return 1
+    return time, particles_trajectoies, collisions_count, collision_points
 
 # Правая часть
 def moving(t, part_prop):
