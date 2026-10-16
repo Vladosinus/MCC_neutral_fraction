@@ -202,8 +202,14 @@ def diffuse_reflection(vars, wall_idx):
 
     Возвращает новый список скоростей [vx, vy, vz].
     """
-    speed = np.sqrt(vars[1]**2 + vars[3]**2 + vars[5]**2)
-
+    # Потери при соударении со стенкой 10,2 % от разницы энергии стенки и частицы
+    speed_old = np.sqrt(vars[1]**2 + vars[3]**2 + vars[5]**2)
+    nrg = (M*speed_old**2)/2
+    deltaE = nrg - 300/11604
+    loss = 0.102*deltaE
+    nrg_new = nrg - loss
+    speed = (2*nrg_new/M)**0.5
+    
     # Полярный угол от внутренней нормали и азимутальный угол
     theta = np.deg2rad(np.random.rand()*180)
     v_normal = speed*np.sin(theta)      # компонента вдоль внутренней нормали (>= 0)
@@ -264,9 +270,9 @@ hit_entrance.terminal = True
 hit_entrance.direction = -1
 # ------------------------------------
 # Генератор заданий
-def _trace_pool(args):
+def _trace_atoms_pool(args):
 
-    i, j, n, N, x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current, t_max = args
+    i, j, n, N, x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current, t_max, recombination_probability = args
     # Начальные условия
     vars0 = [x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current]
     
@@ -282,11 +288,12 @@ def _trace_pool(args):
     # Заготовки под накопление траектории
     t_history = [0]    
     prop_history = [np.array(vars0).copy()]
-    
+    recombined = False
     
     # Так как используем ивенты, будем много перезапускать
     while t0 < t_max:
         # Считаем движение, так как есть ивенты счет остановится при соударении со стенкой
+        
         solution = solve_ivp(
                             fun = moving,
                             t_span = (t0, t_max),
@@ -303,7 +310,7 @@ def _trace_pool(args):
 
         # Если просто вылет из нейтрализатора
         if len(solution.t_events[0]) > 0:
-            return i, j, n, np.array(t_history), prop_history, collisions, collision_marks
+            return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
 
         # Первое столкновение со стенкой
         # Время, когда случилось соударение
@@ -319,27 +326,32 @@ def _trace_pool(args):
 
         if earliest_idx is None:
             # Ничего не произошло — таймаут? за все выделенное время остался в нейтрализаторе и не ударился, а остался в воздухе висеть
-            return i, j, n, np.array(t_history), prop_history, collisions, collision_marks
+            return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
 
-        # Переписываем координаты, где произошло столкновение
-        vars0 = solution.y_events[earliest_idx][0]
-        t0 = earliest_t
-        collisions += 1
-        collision_marks.append((earliest_t, vars0, earliest_idx))
+        # Рекомбинация, если есть, заканчиваем, если нет, то считаем дальше
+        if np.random.rand() <= recombination_probability:
+            # Заканичваем расчет, ставим флаг
+            recombined = True
+            return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
+        else:
+            # Если рекомбинации не было, что продолжаем расчет
+            # Переписываем координаты, где произошло столкновение
+            vars0 = solution.y_events[earliest_idx][0]
+            t0 = earliest_t
+            collisions += 1
+            collision_marks.append((earliest_t, vars0, earliest_idx))
 
-        # Здесь надо считать рекомбинацию на стенке
-
-        # Переписываем начальные скорости по диффузному отражению и обрабатываем возможные события
-        new_v = diffuse_reflection(vars0, earliest_idx)
-        vars0[1] = new_v[0]
-        vars0[3] = new_v[1]
-        vars0[5] = new_v[2]
+            # Переписываем начальные скорости по диффузному отражению и обрабатываем возможные события
+            new_v = diffuse_reflection(vars0, earliest_idx)
+            vars0[1] = new_v[0]
+            vars0[3] = new_v[1]
+            vars0[5] = new_v[2]
         
-    return i, j, n, np.array(t_history), prop_history, collisions, collision_marks
+    return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
     
 # Организатор
-def trace_particles(L, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0):
-    print('Начата трассировка сечени ...')
+def trace_atoms(L, lk, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0, recombination_probability):
+    print(f'Начата трассировка сечения {lk} м ...')
     n_workers = os.cpu_count()
     t_max = L/vx0*5
     tasks = []
@@ -347,30 +359,41 @@ def trace_particles(L, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0):
     for i in range(len(a_grid)):
             for j in range(len(b_grid)):
                 for n in range(N):
-                    tasks.append((i, j, n, N, 0, vx0, y_cell[i, j, n], vy0[i, j, n], z_cell[i, j, n], vz0[i, j, n], t_max))
+                    tasks.append((i, j, n, N, lk, vx0, y_cell[i, j, n], vy0[i, j, n], z_cell[i, j, n], vz0[i, j, n], t_max, recombination_probability))
     chunksize = max(1, len(tasks)//(n_workers*4))
     # Сам расчет
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        results = list(executor.map(_trace_pool, tasks, chunksize=chunksize))
+        results = list(executor.map(_trace_atoms_pool, tasks, chunksize=chunksize))
 
     # Подготовка переменных под распаковку результата
+    is_recombined = np.zeros((len(a_grid), len(b_grid), N))
     time = np.empty((len(a_grid), len(b_grid), N), dtype = object)
     particles_trajectoies = np.empty((len(a_grid), len(b_grid), N), dtype = object)
     collisions_count = np.zeros((len(a_grid), len(b_grid), N))
     collision_points = np.empty((len(a_grid), len(b_grid), N), dtype = object)
+    
 
     # Распаковка результата
-    for i, j, n, t_history, prop_history, collisions, collision_marks in results:
+    for recombined, i, j, n, t_history, prop_history, collisions, collision_marks in results:
         time[i, j, n] = np.array(t_history)
         particles_trajectoies[i, j, n] = np.array(prop_history)
         collisions_count[i, j, n] = collisions
         collision_points[i, j, n] = collision_marks
+        is_recombined[i, j, n] = int(recombined)
     
-    return time, particles_trajectoies, collisions_count, collision_points
+    return time, particles_trajectoies, collisions_count, collision_points, is_recombined
 
 # Правая часть
 def moving(t, part_prop):
     return [part_prop[1], 0, part_prop[3], 0, part_prop[5], 0]
+
+# ==========================================================================
+# Расчет движения молекул с произвольными местами старта
+
+
+
+
+
 
 
 

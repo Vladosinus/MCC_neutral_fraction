@@ -118,7 +118,7 @@ def read_mcc_traj(filepath=DEFAULT_FILE):
             label = line.strip()
             if not label:
                 continue
-            section_match = re.fullmatch(r'section\s+(\d+)', label)
+            section_match = re.fullmatch(r'section\s+(\d+).(\d+),\s+м', label)
             cell_match = re.fullmatch(r'cell indexes\s+(\d+),\s*(\d+)', label)
             if section_match or cell_match or label in FIELDS:
                 finish_field()

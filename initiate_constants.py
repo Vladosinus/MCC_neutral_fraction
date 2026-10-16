@@ -26,6 +26,7 @@ __all__ = ['M',
            'testprofile2',
            'testprofile3',
            'section_amount',
+           'recombination_probability',
            'use_multiprocessing',
            'n_workers']
 
@@ -62,7 +63,8 @@ n_beam = I_beam/(qe*v_beam*a1*b1)
 
 ## Параметры расчета
 N = 2 # Число модельных частиц, запускаемых из одного сечения
-section_amount = 20 # Количество сечений по длине
+section_amount = 2 # Количество сечений по длине
+recombination_probability = 0.1
 
 ## Параметры распараллеливания
 use_multiprocessing = True # Включить распараллеливание трассировки частиц
