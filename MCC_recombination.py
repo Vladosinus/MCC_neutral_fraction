@@ -4,6 +4,7 @@ from scipy.integrate import solve_ivp
 import os
 import h5py
 import math
+from scipy.interpolate import interp1d
 
 from initiate_constants import *
 import auxillary_recombination
@@ -45,10 +46,6 @@ def run_MCC_atoms(filename):
         # Вызываем функция для сохранения данных в файл
         # filename = f'MCC_traj_{recombination_probability}.h5'
         auxillary_recombination.h5py_atoms_saver(l_grid, k, filename, a_grid, b_grid, dt, time, particles_trajectoies, collisions_count, collision_points, is_recombined)
-
-# После сохранения вывода из атомов, нужно его прочитать и
-# переформатировать под ввод в начальные условия движения молекул,
-# затем снова сохранить
 
 # Монте-Карло расчет движения молекул после рекомбинации на стенке
 def run_MCC_molecules(filename_molecules, filename_atoms):
@@ -120,6 +117,7 @@ def run_MCC_molecules(filename_molecules, filename_atoms):
 
     
 if __name__ == '__main__':
+
     # Имя файла
     filename_atoms = f'MCC_atoms_traj_{recombination_probability}.h5'
     filename_molecules = f'MCC_molecules_traj_{recombination_probability}.h5'
@@ -127,15 +125,19 @@ if __name__ == '__main__':
     # Запуск расчета Монте-Карло для атомов
     # run_MCC_atoms(filename_atoms)
 
-    # Подсчет концентрации атомов
+    # Подсчет концентрации атомов без нормировки
     # l_grid, atom_count_per_section = auxillary_recombination.calc_au_atoms_concentration(filename_atoms)
+
+    # Подсчет концентрации атомов с нормировкой
+    auxillary_recombination.calc_dens_atoms_in_time(filename_atoms)
+
+    # exit()
     
     # Запуск решателя Монте-Карло для вторичных молекул
-    run_MCC_molecules(filename_molecules, filename_atoms)
+    # run_MCC_molecules(filename_molecules, filename_atoms)
 
     # Подсчет концентрации молекул
-    l_grid, molecule_count_per_section = auxillary_recombination.calc_au_molecules_concentration(filename_molecules)
-    plt.plot(l_grid, molecule_count_per_section)
-    plt.show()
+    # l_grid, molecule_count_per_section = auxillary_recombination.calc_au_molecules_concentration(filename_molecules)
+
     
     

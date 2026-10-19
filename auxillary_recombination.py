@@ -223,6 +223,7 @@ def diffuse_reflection(vars, wall_idx, particle_type):
         nrg_new = mean_angle_molecule_nrg - loss_collision + add_by_energy
         speed = (2*nrg_new*qe/2/M)**0.5
 
+
     # Полярный угол от внутренней нормали и азимутальный угол
     theta = np.deg2rad(np.random.rand()*180)
     v_normal = speed*np.sin(theta)      # компонента вдоль внутренней нормали (>= 0)
@@ -508,9 +509,80 @@ def calc_au_molecules_concentration(filename):
 
     return l_grid, particles_total
 
+# Функция для интерполяции на регулярной временной сетке координаты x и подсчета концентрации     
+def calc_in_time(filename):
+
+    a_grid, b_grid, l_grid, time, particles_trajectoies, collisions_count, collision_points, is_recombined = h5py_atoms_loader(filename)
         
+    section_count = len(particles_trajectoies)
+    particle_count_in_section = len(particles_trajectoies[0, 0, 0])
+    particle_count = len(a_grid)*len(b_grid)*N
+    particles = np.empty((len(particles_trajectoies), len(a_grid)*len(b_grid)*N), dtype = object)
+    times = np.empty((len(particles_trajectoies), len(a_grid)*len(b_grid)*N), dtype = object)
 
+    # Уберем распределения ячейкам, оставим просто в сечениях
+    for s in range(section_count):
+        # Счетчик индексов для создаваемого массива
+        k = 0
+        for i in range(len(a_grid)):
+            for j in range(len(b_grid)):
+                for n in range(particle_count_in_section):
+                    times[s, k] = time[s][i, j, n]
+                    particles[s, k] = particles_trajectoies[s, i, j, n][:, 0]
+                    k += 1
+    # Теперь есть просто массивы x координаты для каждого сечения для всех частиц и то же самое для времени
+            
+    max_in_section = np.zeros(section_count)
+    mean_in_section = np.zeros(section_count)
+    min_in_section = np.zeros(section_count)
+    # Найдем максимальное время жизни частиц из каждого сечения
+    for s in range(section_count):
+        max_per_particle = []
+        
+        for n in range(particle_count):
+            max_per_particle.append(times[s, n][-1])
+                            
+        mean_in_section[s] = np.mean(max_per_particle) 
+        max_in_section[s] = np.max(max_per_particle)
+        min_in_section[s] = np.min(max_per_particle)
 
+    # Самое большое время существования атома во всех сечениях
+    time_absolute_max = np.max(max_in_section)
+    time_absolute_min = np.min(max_in_section[:-1])
+            
+    # Регулярная сетка для интерполяции
+    time_grid_regular = np.linspace(0, time_absolute_max, 10000)
+    dt_regular = time_grid_regular[1] - time_grid_regular[0]
+    x_particle_regular = np.empty((section_count, particle_count), dtype = object)
+
+    # Интерполируем координаты по сечениям
+    for s in range(section_count):
+        for n in range(particle_count):
+            x_interpolator = interp1d(times[s, n], particles[s, n], kind = 'linear', bounds_error = False, fill_value = None)
+            x_particle_regular[s, n] = x_interpolator(time_grid_regular)
+
+    # Имеем наборы координаты на регулярной сетке с известным шагом, чтобы можно было использовать номировку
+    # Подсчет частиц
+    l_counter_len = 50
+    l_counter = np.linspace(0, L, l_counter_len)
+    # По сечениям
+    for s in range(section_count):
+        # По частицам
+        for n in range(particle_count):
+            # По времени
+            for t in range(time_grid_regular):
+                # По сечениям нейтрализатора
+                for l in range(l_counter_len):
+
+                    if l == 0:
+
+                    elif l == l_counter_len - 1:
+
+                    else:
+
+                        
+
+            
 
 
 
