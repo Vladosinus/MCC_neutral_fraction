@@ -1,15 +1,20 @@
-# from concurrent.futures.process import _threads_wakeups
-import multiprocessing as mp
 import numpy as np
 import os
 from concurrent.futures import ProcessPoolExecutor
 from scipy.integrate import solve_ivp
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
-import matplotlib.pyplot as plt
-
+import h5py
 
 from initiate_constants import *
+
+# Функция для создания сетки в сечениях
+# ==========================================================================
+def create_grid(a_beam, b_beam):
+    la = np.linspace(-a_beam/2, a_beam/2, 10)
+    lb = np.linspace(-b_beam/2, b_beam/2, 10)
+    l_x = np.linspace(0, L, section_amount)
+    return la, lb, l_x
 
 # Функция для распределения частиц по ячейкам в заданном количестве
 # ==========================================================================
@@ -113,10 +118,6 @@ def section_treater():
     for i in range(len(sigmas[:, 0])):
         only_energy_distibution[i] = np.trapezoid(sigmas[i, :], thetas)
 
-    # print(len(sigmas[:, 0]))
-    # print(len(secondary_energy))
-    # exit()
-
     ## Средний угол
     only_angle_distibution = np.zeros(len(sigmas[0, :]))
     for i in range(len(sigmas[0, :])):
@@ -187,7 +188,7 @@ def distribute_velocity_projections(la, lb, v_transverse):
 
 # ==========================================================================
 # Скорости при диффузном отражении
-def diffuse_reflection(vars, wall_idx):
+def diffuse_reflection(vars, wall_idx, particle_type):
     """Диффузное отражение частицы от стенки/входного сечения.
 
     Модуль скорости сохраняется, направление разыгрывается случайно в
@@ -203,13 +204,25 @@ def diffuse_reflection(vars, wall_idx):
     Возвращает новый список скоростей [vx, vy, vz].
     """
     # Потери при соударении со стенкой 10,2 % от разницы энергии стенки и частицы
-    speed_old = np.sqrt(vars[1]**2 + vars[3]**2 + vars[5]**2)
-    nrg = (M*speed_old**2)/2
-    deltaE = nrg - 300/11604
-    loss = 0.102*deltaE
-    nrg_new = nrg - loss
-    speed = (2*nrg_new/M)**0.5
-    
+    if particle_type == 'atoms':
+        # Если атом, обмен энергией со стенкой
+        speed_old = np.sqrt(vars[1]**2 + vars[3]**2 + vars[5]**2)
+        nrg = (M*speed_old**2)/2
+        deltaE = nrg/qe - 300/11604
+        loss = 0.102*deltaE
+        nrg_new = nrg/qe - loss
+        speed = (2*nrg_new*qe/M)**0.5
+
+    elif particle_type == 'molecules':
+        # Если молекула, обмен энергией со стенкой
+        speed_old = np.sqrt(vars[1]**2 + vars[3]**2 + vars[5]**2)
+        nrg = (M*speed_old**2)/2
+        deltaE = nrg/qe - 300/11604
+        loss_collision = 0.102*deltaE
+        add_by_energy = 0.5*deltaE
+        nrg_new = mean_angle_molecule_nrg - loss_collision + add_by_energy
+        speed = (2*nrg_new*qe/2/M)**0.5
+
     # Полярный угол от внутренней нормали и азимутальный угол
     theta = np.deg2rad(np.random.rand()*180)
     v_normal = speed*np.sin(theta)      # компонента вдоль внутренней нормали (>= 0)
@@ -232,170 +245,270 @@ def diffuse_reflection(vars, wall_idx):
         return [vars[1], vars[3], vars[5]]
 
 # ==========================================================================
-## Трассировка частиц, правая часть и ивенты
-# Правая часть
-def moving(t, part_prop):
-    return [part_prop[1], 0, part_prop[3], 0, part_prop[5], 0]
+# Функция для сохранения MCC атомов в файл
+def h5py_atoms_saver(l_grid, k, filename, a_grid, b_grid, dt, time, particles_trajectoies, collisions_count, collision_points, is_recombined):
 
-# Ивенты
-# ------------------------------------
-def leave_neutr(t, part_prop):
-    return part_prop[0] - L
-leave_neutr.terminal = True
-leave_neutr.direction = 1
+    # Если в пределах запуска файл существует, до в него дописываем,
+    # если нет, то создаем и пишем для следующих сечений в него
+    if os.path.exists(filename):
+        mode = 'a'
+    else:
+        mode = 'w'
 
-def hit_left(t, part_prop):
-    return part_prop[2] + a/2
-hit_left.terminal = True
-hit_left.direction = -1
+    # Сама запись в файл
+    with h5py.File(filename, mode) as f:
 
-def hit_right(t, part_prop):
-    return part_prop[2] - a/2
-hit_right.terminal = True
-hit_right.direction = 1
+        # Создание группы - сечение
+        grp = f.create_group(f'section_{k}')
 
-def hit_bottom(t, part_prop):
-    return part_prop[4] + b/2
-hit_bottom.terminal = True
-hit_bottom.direction = -1
+        # Заготовка датасетов под переменные
+        # Время
+        dset_time = grp.create_dataset('time', shape = (len(a_grid), len(b_grid), N), dtype=dt)
+        # Траектории
+        dset_particles_trajectoies_data = grp.create_dataset('particles_trajectoies_data', shape = (len(a_grid), len(b_grid), N), dtype=dt)
+        dset_particles_trajectoies_shape = grp.create_dataset('particles_trajectoies_shape', shape = (len(a_grid), len(b_grid), N, 2), dtype=np.int32)
+        # Количество соударений
+        dset_collisions_count = grp.create_dataset('collisions_count', shape = (len(a_grid), len(b_grid), N), dtype=np.int32)
+        # # Точки соударений со стенкой
+        dset_collision_points_data = grp.create_dataset('collision_points_data', shape = (len(a_grid), len(b_grid), N), dtype=dt)
+        dset_collision_points_shape = grp.create_dataset('collision_points_shape', shape = (len(a_grid), len(b_grid), N, 2), dtype=np.int32)
+        # Флаг, была ли рекомбинация
+        dset_is_recombined = grp.create_dataset('is_recombined', shape = (len(a_grid), len(b_grid), N), dtype=np.int32)
 
-def hit_top(t, part_prop):
-    return part_prop[4] - b/2
-hit_top.terminal = True
-hit_top.direction = 1
-
-def hit_entrance(t, part_prop):
-    return part_prop[0]
-hit_entrance.terminal = True
-hit_entrance.direction = -1
-# ------------------------------------
-# Генератор заданий
-def _trace_atoms_pool(args):
-
-    i, j, n, N, x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current, t_max, recombination_probability = args
-    # Начальные условия
-    vars0 = [x0, vx0_current, y_cell_current, vy0_current, z_cell_current, vz0_current]
+        # Заполнение датасетов
+        for i_h5 in range(len(a_grid)):
+            for j_h5 in range(len(b_grid)):
+                for k_h5 in range(N):
+                    # Время жизни
+                    dset_time[i_h5, j_h5, k_h5] = time[i_h5][j_h5][k_h5]
+                    # Количество соударений
+                    dset_collisions_count[i_h5, j_h5, k_h5] = collisions_count[i_h5][j_h5][k_h5]
+                    # Флаг рекомбинации
+                    dset_is_recombined[i_h5, j_h5, k_h5] = is_recombined[i_h5, j_h5, k_h5]
     
-    # Ивенты
-    events = [leave_neutr, hit_left, hit_right, hit_bottom, hit_top, hit_entrance]
-    
-    # Время, по которому расчет
-    t0 = 0
-    # Счетчик столкновений
-    collisions = 0
-    # Координаты и прочее для столкновений
-    collision_marks = []
-    # Заготовки под накопление траектории
-    t_history = [0]    
-    prop_history = [np.array(vars0).copy()]
-    recombined = False
-    
-    # Так как используем ивенты, будем много перезапускать
-    while t0 < t_max:
-        # Считаем движение, так как есть ивенты счет остановится при соударении со стенкой
-        
-        solution = solve_ivp(
-                            fun = moving,
-                            t_span = (t0, t_max),
-                            y0 = vars0,
-                            method = 'RK45',
-                            events = events,
-                            max_step = t_max/5,
-                            rtol=1e-8, atol=1e-10)
+        for i_h5 in range(len(a_grid)):
+            for j_h5 in range(len(b_grid)):
+                for k_h5 in range(N):
+                    # Траектории
+                    arr = particles_trajectoies[i_h5, j_h5, k_h5]
+                    dset_particles_trajectoies_data[i_h5, j_h5, k_h5] = arr.ravel()
+                    dset_particles_trajectoies_shape[i_h5, j_h5, k_h5] = arr.shape
+                    # Точки столкновений
+                    arr = collision_points[i_h5, j_h5, k_h5]
+                    dset_collision_points_data[i_h5, j_h5, k_h5] = arr.ravel()
+                    dset_collision_points_shape[i_h5, j_h5, k_h5] = arr.shape
 
-        # Накапливаетс ятраектория
-        for i_history in range(1, len(solution.t)):
-            t_history.append(solution.t[i_history])
-            prop_history.append(solution.y[:, i_history].copy())            
-
-        # Если просто вылет из нейтрализатора
-        if len(solution.t_events[0]) > 0:
-            return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
-
-        # Первое столкновение со стенкой
-        # Время, когда случилось соударение
-        earliest_t = None
-        # Индекс стенки, соответствцует индексу ивента в списке ивентов
-        earliest_idx = None
-        # Проходим по всме ивентам и ищем, какой из них сработал
-        for idx in range(1, len(solution.t_events)):
-            ev = solution.t_events[idx]
-            if len(ev) > 0 and (earliest_t is None or ev[0] < earliest_t):
-                earliest_t = ev[0]
-                earliest_idx = idx
-
-        if earliest_idx is None:
-            # Ничего не произошло — таймаут? за все выделенное время остался в нейтрализаторе и не ударился, а остался в воздухе висеть
-            return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
-
-        # Рекомбинация, если есть, заканчиваем, если нет, то считаем дальше
-        if np.random.rand() <= recombination_probability:
-            # Заканичваем расчет, ставим флаг
-            recombined = True
-            return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
-        else:
-            # Если рекомбинации не было, что продолжаем расчет
-            # Переписываем координаты, где произошло столкновение
-            vars0 = solution.y_events[earliest_idx][0]
-            t0 = earliest_t
-            collisions += 1
-            collision_marks.append((earliest_t, vars0, earliest_idx))
-
-            # Переписываем начальные скорости по диффузному отражению и обрабатываем возможные события
-            new_v = diffuse_reflection(vars0, earliest_idx)
-            vars0[1] = new_v[0]
-            vars0[3] = new_v[1]
-            vars0[5] = new_v[2]
-        
-    return recombined, i, j, n, np.array(t_history), prop_history, collisions, collision_marks
-    
-# Организатор
-def trace_atoms(L, lk, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0, recombination_probability):
-    print(f'Начата трассировка сечения {lk} м ...')
-    n_workers = os.cpu_count()
-    t_max = L/vx0*5
-    tasks = []
-    # Пул задач
-    for i in range(len(a_grid)):
-            for j in range(len(b_grid)):
-                for n in range(N):
-                    tasks.append((i, j, n, N, lk, vx0, y_cell[i, j, n], vy0[i, j, n], z_cell[i, j, n], vz0[i, j, n], t_max, recombination_probability))
-    chunksize = max(1, len(tasks)//(n_workers*4))
-    # Сам расчет
-    with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        results = list(executor.map(_trace_atoms_pool, tasks, chunksize=chunksize))
-
-    # Подготовка переменных под распаковку результата
-    is_recombined = np.zeros((len(a_grid), len(b_grid), N))
-    time = np.empty((len(a_grid), len(b_grid), N), dtype = object)
-    particles_trajectoies = np.empty((len(a_grid), len(b_grid), N), dtype = object)
-    collisions_count = np.zeros((len(a_grid), len(b_grid), N))
-    collision_points = np.empty((len(a_grid), len(b_grid), N), dtype = object)
-    
-
-    # Распаковка результата
-    for recombined, i, j, n, t_history, prop_history, collisions, collision_marks in results:
-        time[i, j, n] = np.array(t_history)
-        particles_trajectoies[i, j, n] = np.array(prop_history)
-        collisions_count[i, j, n] = collisions
-        collision_points[i, j, n] = collision_marks
-        is_recombined[i, j, n] = int(recombined)
-    
-    return time, particles_trajectoies, collisions_count, collision_points, is_recombined
-
-# Правая часть
-def moving(t, part_prop):
-    return [part_prop[1], 0, part_prop[3], 0, part_prop[5], 0]
+        if k == len(l_grid) - 1:
+            grp = f.create_group(f'geometry')
+            dset_geometry = grp.create_dataset('geometry', shape = (3, 1), dtype = dt)
+            dset_geometry[0] = a_grid
+            dset_geometry[1] = b_grid
+            dset_geometry[2] = l_grid
 
 # ==========================================================================
-# Расчет движения молекул с произвольными местами старта
+# Функция для чтения MCC атомов из файла
+def h5py_atoms_loader(filename):
+    # Открываем файл
+    with h5py.File(filename, 'r') as f:
 
+        # Чтение геометрии, тодельно, чтобы не в цикле
+        grp_geo = f['geometry']
+        geom = grp_geo['geometry'][:]
+        # Ниже второй [0] нужен, так как это список массивов с одним массивм
+        a_grid = geom[0][0]
+        b_grid = geom[1][0]
+        l_grid = geom[2][0]
 
+        # Заготовки под траектории и положения столкновений
 
+        time = np.empty(( len(f.keys()) - 1), dtype=object)
+        is_recombined = np.empty(( len(f.keys()) - 1), dtype=object)
+        # Так как они многомерные, и для них использовалась форма
+        particles_trajectoies = np.empty(( (len(f.keys()) - 1), len(a_grid), len(b_grid), N), dtype = object)
+        collision_points = np.empty(( (len(f.keys()) - 1), len(a_grid), len(b_grid), N), dtype = object)
+        
+        # Так как сечений много, будет цикл по сечениям
+        for k in range(len(f.keys()) - 1):
+            
+            # Чтение времени, там одномерные массивы
+            grp = f[f'section_{k}']
+            # Время
+            time[k] = grp['time'][:]
+            # Траектории
+            particles_trajectoies_data = grp['particles_trajectoies_data'][:]
+            particles_trajectoies_shape = grp['particles_trajectoies_shape'][:]
+            # Количество соударений
+            collisions_count = grp['collisions_count'][:]
+            # Точки соударений        
+            collision_points_data = grp['particles_trajectoies_data'][:]
+            collision_points_shape = grp['particles_trajectoies_shape'][:]
+            # Флаг рекомбинации
+            is_recombined[k] = grp['is_recombined'][:]
+            
+            for i in range(len(a_grid)):
+                for j in range(len(b_grid)):
+                    for n in range(N):
+                        # Траектории
+                        M, K = particles_trajectoies_shape[i, j, n]                            
+                        particles_trajectoies[k, i, j, n] = particles_trajectoies_data[i, j, n].reshape(M, K)
+                        # Точки столкновений
+                        M, K = collision_points_shape[i, j, n]
+                        collision_points[k, i, j, n] = collision_points_data[i, j, n].reshape(M, K)
 
+    return a_grid, b_grid, l_grid, time, particles_trajectoies, collisions_count, collision_points, is_recombined
 
+# ==========================================================================
+# Функция для сохранения MCC молекул в файл
+def h5py_molecules_saver(filename, time, particles_trajectoies, collisions_count, dt):
 
+    with h5py.File(filename, 'w') as f:
+        # Создание датасетов
+        # Время
+        dset_time = f.create_dataset('time', shape = (len(time)), dtype = dt)
+        # Траектории
+        dset_particles_trajectoies_data = f.create_dataset('particles_trajectoies_data', shape = (len(time)), dtype = dt)
+        dset_particles_trajectoies_shape = f.create_dataset('particles_trajectoies_shape', shape = (len(time), 2), dtype = np.int32)
+        # Количество соударений
+        dset_collisions_count = f.create_dataset('collisions_count', shape = (len(time)), dtype = np.int32)
+        # Сохранение
+        for i in range(len(time)):
+            # Время
+            dset_time[i] = time[i]
+            # Траектории
+            arr = particles_trajectoies[i]
+            dset_particles_trajectoies_data[i] = arr.ravel()
+            dset_particles_trajectoies_shape[i] = arr.shape
+            # Количество соударений
+            dset_collisions_count[i] = collisions_count[i]
+            
+# ==========================================================================
+# Функция для чтения MCC молекул из файла
+def h5py_molecules_loader(filename):
+    with h5py.File(filename, 'r') as f:
 
+        # Время
+        time = f[f'time'][:]
+        # Число столкновений
+        collisions_count = f[f'collisions_count'][:]
+
+        # Траектории
+        particles_trajectoies_data = f[f'particles_trajectoies_data'][:]
+        particles_trajectoies_shape = f[f'particles_trajectoies_shape'][:]
+
+        particles_trajectoies = np.empty(len(time), dtype = object)
+        
+        for i in range(len(time)):
+            M, K = particles_trajectoies_shape[i]
+            particles_trajectoies[i] = particles_trajectoies_data[i].reshape(M, K)
+
+    return time, particles_trajectoies, collisions_count
+        
+# ==========================================================================
+# Функция для подсчета концентрации атомов
+def calc_au_atoms_concentration(filename):
+    """
+    Пересчитывает распределение в штуках частиц из координат на заданной сетке вдоль нейтрализатора
+    """
+    # Загружаем файл с концентрациями
+    a_grid, b_grid, l_grid_file, time, particles_trajectoies, collisions_count, collision_points, is_recombined = h5py_atoms_loader(filename)
+        
+    section_count = len(time)
+    l_grid = np.linspace(0, l_grid_file[-1], 50)
+    hl = l_grid[1] - l_grid[0]
+    
+    # Пустая заготовка под накопление частиц во всех сечениях
+    particles_total = np.empty((section_count, len(a_grid), len(b_grid), N), dtype = object)
+
+    # Идем по сечениям
+    for s in range(section_count):
+        # В каждом сечении проходим по всем ячейкам
+        for i in range(len(a_grid)):
+            for j in range(len(b_grid)):
+                # Проходим по всем частицам в сечении
+                for n in range(len(time[s][i, j])):
+                    
+                    # Пустая переменная под накопление частиц
+                    part_count = np.zeros((len(l_grid), len(time[s][i, j, n])))
+                    # Проходим во массиву времени
+                    for t in range(len(time[s][i, j, n])):
+                        # Положение рассматриваемой частицы в рассматриваемый момнет времени
+                        x_part = particles_trajectoies[s][i, j, n][t, 0]
+                        # Цикл по сетке по длине нейтрализатора, чтобы искаьт
+                        for l in range(len(l_grid)):
+                            if l == 0:    
+                                if x_part < l_grid[l] + hl/2:
+                                    part_count[l, t] += 1
+                                    
+
+                            elif l == len(l_grid) - 1:
+                                if x_part >= l_grid[l] - hl/2 and x_part < l_grid[l]:
+                                    part_count[l, t] += 1
+                                    
+                            else:
+                                if x_part >= l_grid[l] - hl/2 and x_part < l_grid[l] + hl/2:
+                                    part_count[l, t] += 1 
+                    # Собираем в распределение по длине           
+                    particles_total[s, i, j, n] = np.sum(part_count, axis = 1)
+
+    # Теперь надо собрать просто в один массив, все везде просуммировать
+    # Накопление в пределах одного сечения
+    count_per_cell = np.zeros((len(a_grid), len(b_grid), len(l_grid)))
+    # Накопление по разным сечениям
+    count_per_section = np.empty((section_count, len(l_grid)))
+    for s in range(section_count):
+    # В каждом сечении проходим по всем ячейкам
+        for i in range(len(a_grid)):
+            for j in range(len(b_grid)):
+                count_per_cell[i, j] = np.sum(particles_total[s, i, j, :], axis = 0)
+        count_per_section[s] = np.sum(count_per_cell, axis = (0, 1))
+
+    return l_grid, count_per_section
+
+# ==========================================================================
+# Функция для подсчета концентрации молекул
+def calc_au_molecules_concentration(filename):
+    """
+    Пересчитывает распределение в штуках частиц из координат на заданной сетке вдоль нейтрализатора
+    """
+    # Загружаем файл с концентрациями
+    time, particles_trajectoies, _ = h5py_molecules_loader(filename)
+    l_grid = np.linspace(0, L, 50)
+    hl = l_grid[1] - l_grid[0]
+    
+    # Пустая заготовка под накопление частиц во всех сечениях
+    particles_total = np.zeros(len(l_grid), dtype = object)
+    count_per_part = np.zeros(len(time), dtype = object)
+
+    # Проходим по всем частицам
+    for n in range(len(time)):
+        # Пустая переменная под накопление частиц
+        part_count = np.zeros((len(l_grid), len(time[n])))
+        # Проходим во массиву времени
+        for t in range(len(time[n])):
+            # Положение рассматриваемой частицы в рассматриваемый момнет времени
+            x_part = particles_trajectoies[n][t, 0]
+            # Цикл по сетке по длине нейтрализатора, чтобы искаьт
+            for l in range(len(l_grid)):
+                if l == 0:    
+                    if x_part < l_grid[l] + hl/2:
+                        part_count[l, t] += 1
+                        
+
+                elif l == len(l_grid) - 1:
+                    if x_part >= l_grid[l] - hl/2 and x_part < l_grid[l]:
+                        part_count[l, t] += 1
+                        
+                else:
+                    if x_part >= l_grid[l] - hl/2 and x_part < l_grid[l] + hl/2:
+                        part_count[l, t] += 1 
+        # Вклад от одной частицы во все времена по сечениям
+        count_per_part[n] = np.sum(part_count, axis = 1)
+    # Распределение в сечениях от всех частиц
+    particles_total = np.sum(count_per_part, axis = 0)
+
+    return l_grid, particles_total
+
+        
 
 
 
