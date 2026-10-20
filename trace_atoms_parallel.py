@@ -140,7 +140,7 @@ def trace_atoms(L, lk, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0, recombi
     for i in range(len(a_grid)):
             for j in range(len(b_grid)):
                 for n in range(N):
-                    tasks.append((i, j, n, N, lk, vx0, y_cell[i, j, n], vy0[i, j, n], z_cell[i, j, n], vz0[i, j, n], t_max, recombination_probability))
+                    tasks.append((i, j, n, N, lk, vx0[i, j, n], y_cell[i, j, n], vy0[i, j, n], z_cell[i, j, n], vz0[i, j, n], t_max, recombination_probability))
     chunksize = max(1, len(tasks)//(n_workers*4))
     # Сам расчет
     with ProcessPoolExecutor(max_workers=n_workers) as executor:

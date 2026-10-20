@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from concurrent.futures import ProcessPoolExecutor
-from scipy.integrate import solve_ivp
+from scipy.integrate import solve_ivp, trapezoid
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 import h5py
@@ -11,8 +11,8 @@ from initiate_constants import *
 # Функция для создания сетки в сечениях
 # ==========================================================================
 def create_grid(a_beam, b_beam):
-    la = np.linspace(-a_beam/2, a_beam/2, 10)
-    lb = np.linspace(-b_beam/2, b_beam/2, 10)
+    la = np.linspace(-a_beam/2, a_beam/2, 5)
+    lb = np.linspace(-b_beam/2, b_beam/2, 5)
     l_x = np.linspace(0, L, section_amount)
     return la, lb, l_x
 
@@ -509,11 +509,11 @@ def calc_au_molecules_concentration(filename):
 
     return l_grid, particles_total
 
-# Функция для интерполяции на регулярной временной сетке координаты x и подсчета концентрации     
-def calc_in_time(filename):
+# Функция для интерполяции на регулярной временной сетке координаты x и подсчета концентрации атома    
+def calc_dens_atoms_in_time(filename):
 
-    a_grid, b_grid, l_grid, time, particles_trajectoies, collisions_count, collision_points, is_recombined = h5py_atoms_loader(filename)
-        
+    a_grid, b_grid, l_grid, time, particles_trajectoies, _, _, _ = h5py_atoms_loader(filename)
+
     section_count = len(particles_trajectoies)
     particle_count_in_section = len(particles_trajectoies[0, 0, 0])
     particle_count = len(a_grid)*len(b_grid)*N
@@ -535,6 +535,7 @@ def calc_in_time(filename):
     max_in_section = np.zeros(section_count)
     mean_in_section = np.zeros(section_count)
     min_in_section = np.zeros(section_count)
+
     # Найдем максимальное время жизни частиц из каждого сечения
     for s in range(section_count):
         max_per_particle = []
@@ -550,8 +551,9 @@ def calc_in_time(filename):
     time_absolute_max = np.max(max_in_section)
     time_absolute_min = np.min(max_in_section[:-1])
             
-    # Регулярная сетка для интерполяции
-    time_grid_regular = np.linspace(0, time_absolute_max, 10000)
+    # Регулярная сетка по времени для интерполяции
+    time_regular_count = int(1e4)
+    time_grid_regular = np.linspace(0, time_absolute_max, time_regular_count)
     dt_regular = time_grid_regular[1] - time_grid_regular[0]
     x_particle_regular = np.empty((section_count, particle_count), dtype = object)
 
@@ -563,26 +565,340 @@ def calc_in_time(filename):
 
     # Имеем наборы координаты на регулярной сетке с известным шагом, чтобы можно было использовать номировку
     # Подсчет частиц
-    l_counter_len = 50
-    l_counter = np.linspace(0, L, l_counter_len)
+
+    # Что ниже пока оставить, мысль о том, чтобы использовать ту же пространственную сетку, что для генерации
+    # l_counter_len = 50
+    # l_counter = np.linspace(0, L, l_counter_len)
+    l_counter = l_grid
+    l_counter_len = len(l_counter)
+    hl = l_counter[1] - l_counter[0]
+
+    part_count = np.zeros((section_count, l_counter_len, time_regular_count), dtype = object)
     # По сечениям
     for s in range(section_count):
         # По частицам
         for n in range(particle_count):
             # По времени
-            for t in range(time_grid_regular):
+            for t in range(time_regular_count):
+                if x_particle_regular[s, n][t] != None:
                 # По сечениям нейтрализатора
-                for l in range(l_counter_len):
+                    for l in range(l_counter_len):
+                        if l == 0:    
+                            if x_particle_regular[s, n][t] < l_counter[l] + hl/2:
+                                part_count[s, l, t] += 1
+                            
+                        elif l == len(l_grid) - 1:
+                            if x_particle_regular[s, n][t] >= l_counter[l] - hl/2 and x_particle_regular[s, n][t] < l_counter[l]:
+                                part_count[s, l, t] += 1
+                                
+                        else:
+                            if x_particle_regular[s, n][t] >= l_counter[l] - hl/2 and x_particle_regular[s, n][t] < l_counter[l] + hl/2:
+                                part_count[s, l, t] += 1 
+    # Заготовка под распределения из каждого сечения 
+    sum_part = np.zeros((section_count, l_counter_len))
+    
+    # Собираем из разных времен в массив
+    for s in range(section_count - 1):
+        sum_part[s] = np.sum(part_count[s, :, :], axis = 1)
 
-                    if l == 0:
+    return l_counter, sum_part, dt_regular, particle_count
 
-                    elif l == l_counter_len - 1:
-
-                    else:
-
-                        
+# Функция для интерполяции на регулярной временной сетке координаты x и подсчета концентрации атома
 
             
+# ==========================================================================
+# Все про пучок
+# Загрузка сечений для взаимодействия пучка
+def load_sigmas():
+    numbers = []
+    started = False # Маркер начала данных
+    ## Загружаются сечения дли ионов
+    with open('proton_sigmas.txt', 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not started:
+                if line == '':
+                    started = True
+                continue
+            if started:
+                try:
+                    row = [float(x) for x in line.split()]
+                    numbers.append(row)
+                except ValueError:
+                    continue
+    proton_sigmas = np.array(numbers).ravel()
+
+    numbers = []
+    started = False
+    ## Загружаются сечения дли нейтралов
+    with open('neutral_sigmas.txt', 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if not started:
+                    if line == '':
+                        started = True
+                    continue
+                if started:
+                    try:
+                        row = [float(x) for x in line.split()]
+                        numbers.append(row)
+                    except ValueError:
+                        continue
+    neutral_sigmas = np.array(numbers).ravel()
+    generation_sigmas = np.array([neutral_sigmas, proton_sigmas], dtype = object)
+    return generation_sigmas     
+
+# Функция для расчета концентрации
+def calculate_diffusion_flow(vars):
+    l, dl, D, inflow = vars
+
+    # Просто натекание из левой границы, поток
+    t_pass = L/((3*kB*T/M2)**0.5)
+    t_max = 50*t_pass
+
+    def diffusion(t, n):
+        dndt = np.zeros_like(n)
+        for i in range(1, len(dndt) - 1):
+            d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+            dndt[i] = D*d2n_dx2
+
+        dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl
+        dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2
+
+        return dndt
+    
+    n_IC = np.zeros(len(l))
+    solution = solve_ivp(fun=diffusion,
+                        t_span=(0, t_max),
+                        y0=n_IC,
+                        method='RK45')
+        
+    return solution
+
+# Функция для расчет ионов и нейтралов
+def beam_transform(n_gas, l_grid):
+    # загрузка сечений перезарядки и обдирки
+    generation_sigmas = load_sigmas()
+    sigmas = [generation_sigmas[0][1], generation_sigmas[1][1]]
+    ## Тут будет логика расчета, и вызов решателя
+    # Правая часть будет просто объявлена, чтобы не делать функцию внутри функции
+    
+    t_span = (0, l_grid[-1])
+    # Нормировано на 1, лучше так делать, а потом уже умножать на всякое, если надо
+    I0 = [0, 1]
+    args = n_gas, sigmas, l_grid
+
+    solution = solve_ivp(rbt,
+                         t_span = t_span,
+                         y0 = I0,
+                         method = 'RK45',
+                         dense_output = True,
+                         args = args,
+                         max_step = L/20
+                         )
+
+    I_interpolated = solution.sol(l_grid)
+    
+    return I_interpolated
+
+# Правая часть для beam_transform
+def rbt(t, I, n_gas_origin, sigmas, l):
+
+    gas_interpolator = interp1d(l, n_gas_origin, fill_value=0, bounds_error=False, kind = 'linear')
+    n_gas = gas_interpolator(t)
+
+    sigma01 = sigmas[0]
+    sigma10 = sigmas[1]    
+
+    dI0 = n_gas*I[1]*sigma10 - n_gas*I[0]*sigma01
+    dI1 = n_gas*I[0]*sigma01 - n_gas*I[1]*sigma10
+
+    return [dI0, dI1]
+
+# Функция для расчета генерации АТОМОВ пучком и электронами       
+def generation_by_beam(n_gas, beam_properties):
+    # Загрузка сечений дли взаимодействия пучка
+    generation_sigmas = load_sigmas()
+    v, n_beam = beam_properties
+
+    ## Генерация атомами
+    neutral_total_sigma = generation_sigmas[0][2] + 2*generation_sigmas[0][3] + generation_sigmas[0][6] + generation_sigmas[0][8]
+    Q0 = n_gas*n_beam[0]*neutral_total_sigma*v
+    
+    ## Генерация ионами
+    proton_total_sigma = 2*generation_sigmas[1][3] + generation_sigmas[1][5]
+    Q1 = n_gas*n_beam[1]*proton_total_sigma*v
+
+    ## генерация вторичной плазмой
+    Qe = np.zeros(len(n_gas))
+    
+    return [Q0, Q1, Qe]
+
+# Функция для расчета концентрации газа с учетом пучка
+def calculate_diffusion_flow_with_beam(vars):
+
+    l, dl, D, inflow, n_beam, v_beam, n_gas_prev = vars
+    # Сечения
+    sigmas_beam = load_sigmas()
+    sigma_neutr = np.sum(sigmas_beam[0][[0, 2, 3, 4, 5, 6]])
+    sigma_proton = np.sum(sigmas_beam[1][[0, 1, 2, 3]])
+
+    t_pass = l[-1]/((3*kB*T/M2)**0.5)
+    t_max = 50*t_pass
+
+    def diffusion(t, n):
+        dndt = np.zeros_like(n)
+        for i in range(1, len(dndt) - 1):
+            electron_depletion = 0#[i]*ne[i]*sigmaV
+            depletion = - n[i]*n_beam[0][i]*v_beam*sigma_neutr - n[i]*n_beam[1][i]*v_beam*sigma_proton
+            d2n_dx2 = (n[i-1] - 2*n[i] + n[i+1])/dl**2
+            dndt[i] = D*d2n_dx2 + depletion + electron_depletion
+
+        depletion_0 =  - n[i]*n_beam[0][i]*v_beam*sigma_neutr - n[i]*n_beam[1][i]*v_beam*sigma_proton
+        electron_depletion_0 = 0
+        dndt[0] = 2*D*(n[1] - n[0])/dl**2 + 2*inflow/dl + depletion_0 + electron_depletion_0
+
+        depletion_end = - n[i]*n_beam[0][i]*v_beam*sigma_neutr - n[i]*n_beam[1][i]*v_beam*sigma_proton
+        electron_depletion_end = 0
+        dndt[-1] = D*(n[-2] - 2*n[-1])/dl**2 + depletion_end + electron_depletion_end
+
+        return dndt
+    
+    n_IC = np.zeros(len(n_gas_prev))#n_gas_prev
+    solution = solve_ivp(fun=diffusion,
+                        t_span=(0, t_max),
+                        y0=n_IC,
+                        method='RK45')
+        
+    return solution
+
+# ==================================================================================================
+# Электроны
+# Функция для загрузки сечени электронов из файла
+def load_electron_sigmas():
+    # На этих сетках будет интерполяция
+    nrg = np.linspace(1e-3, 200, 5000)
+    velocity = np.sqrt(2*nrg*qe/me)
+
+    path = 'props/electrons_sigmas/'
+    # Загружаем и интерполируем сечение на заданной сетке по энергии
+    sigma_electron_ionization_molecular = np.loadtxt(path + 'Molecules_ionization_by_electron.txt')
+    E = sigma_electron_ionization_molecular[:, 0]
+    vnrg = np.sqrt(2*E*qe/me)
+    sigma_molecular = sigma_electron_ionization_molecular[:, 1]
+    sigma_molecular_interpolator = interp1d(E, sigma_molecular, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_molecular = sigma_molecular_interpolator(nrg)
+    
+    sngr_molecular_interpolator = interp1d(vnrg, sigma_molecular, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_vel_molecular = sngr_molecular_interpolator(velocity)
+
+    del sngr_molecular_interpolator
+    del sigma_molecular_interpolator
+
+    sigma_electron_0 = sigma_electron_ionization_molecular
+    sigma_electron_0_vel = sigma_electron_ionization_vel_molecular
+    
+    #####
+
+    sigma_electron_ionization_atomar = np.loadtxt(path + 'Atoms_ionization_by_electron.txt')
+    E = sigma_electron_ionization_atomar[:, 0]
+    vnrg = np.sqrt(2*E*qe/me)
+    sigma_atomar = sigma_electron_ionization_atomar[:, 1]
+    sigma_atomar_interpolator = interp1d(E, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_atomar = sigma_atomar_interpolator(nrg)
+
+    sngr_atomar_interpolator = interp1d(vnrg, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_vel_atomar = sngr_atomar_interpolator(velocity)
+
+    del sngr_atomar_interpolator
+    del sigma_atomar_interpolator
+
+    sigma_electron_1 = sigma_electron_ionization_atomar
+    sigma_electron_1_vel = sigma_electron_ionization_vel_atomar
+
+    #######
+
+    sigma_electron_ionization_atomar = np.loadtxt(path + 'Molecular_ion_dissociation_with_one_ion_and_ionization_second_atom_by_electron.txt')
+    E = sigma_electron_ionization_atomar[:, 0]
+    vnrg = np.sqrt(2*E*qe/me)
+    sigma_atomar = sigma_electron_ionization_atomar[:, 1]
+    sigma_atomar_interpolator = interp1d(E, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_atomar = sigma_atomar_interpolator(nrg)
+
+    sngr_atomar_interpolator = interp1d(vnrg, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_vel_atomar = sngr_atomar_interpolator(velocity)
+
+    del sngr_atomar_interpolator
+    del sigma_atomar_interpolator
+
+    sigma_electron_2 = sigma_electron_ionization_atomar
+    sigma_electron_2_vel = sigma_electron_ionization_vel_atomar
+
+    #######
+
+    sigma_electron_ionization_atomar = np.loadtxt(path + 'Molecular_ion_dissociation_with_one_atom_and_second_ion_neutralization_by_electron.txt')
+    E = sigma_electron_ionization_atomar[:, 0]
+    vnrg = np.sqrt(2*E*qe/me)
+    sigma_atomar = sigma_electron_ionization_atomar[:, 1]
+    sigma_atomar_interpolator = interp1d(E, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_atomar = sigma_atomar_interpolator(nrg)
+
+    sngr_atomar_interpolator = interp1d(vnrg, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_vel_atomar = sngr_atomar_interpolator(velocity)
+
+    del sngr_atomar_interpolator
+    del sigma_atomar_interpolator
+
+    sigma_electron_3 = sigma_electron_ionization_atomar
+    sigma_electron_3_vel = sigma_electron_ionization_vel_atomar
+
+    # Это сечение очень странное, оно максимально при 0,1 эВ, пусть оно пока нулем побудет
+
+    #######
+
+    sigma_electron_ionization_atomar = np.loadtxt(path + 'Molecular_ion_dissociation_with_one_ion_and_one_atom_by_electron.txt')
+    E = sigma_electron_ionization_atomar[:, 0]
+    vnrg = np.sqrt(2*E*qe/me)
+    sigma_atomar = sigma_electron_ionization_atomar[:, 1]
+    sigma_atomar_interpolator = interp1d(E, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_atomar = sigma_atomar_interpolator(nrg)
+
+    sngr_atomar_interpolator = interp1d(vnrg, sigma_atomar, fill_value = 0, bounds_error=False, kind = 'cubic')
+    sigma_electron_ionization_vel_atomar = sngr_atomar_interpolator(velocity)
+
+    del sngr_atomar_interpolator
+    del sigma_atomar_interpolator
+
+    sigma_electron_4 = sigma_electron_ionization_atomar
+    sigma_electron_4_vel = sigma_electron_ionization_vel_atomar
+
+    ## Расшифровка сечений
+    # sigma_electron_0 Ионизация молекулы
+    # sigma_electron_1 Ионизация атома
+    # sigma_electron_2 Диссоциация молекулярного иона с рождением иона и ионизацией атома
+    # sigma_electron_3 Диссоциация молекулярного иона с нейтрализацией иона и образованием атома
+    # sigma_electron_4 Диссоциация молекулярного иона с образованием атома и иона
+
+    return nrg, velocity, sigma_electron_0, sigma_electron_1, \
+        sigma_electron_2,sigma_electron_3, sigma_electron_4, \
+            sigma_electron_0_vel, sigma_electron_1_vel, sigma_electron_2_vel, \
+                sigma_electron_3_vel, sigma_electron_4_vel
+
+# Расчет усредненных sigmaV
+def calc_sigmaV(Te, velocity, sigma_electron_0_vel, sigma_electron_1_vel, sigma_electron_2_vel, sigma_electron_3_vel, sigma_electron_4_vel):
+
+    # распредление Максвелла
+    maxvell = 4*np.pi*velocity**2*(me/(2*np.pi*kB*Te*11600))**(3/2)*np.exp(-(me*velocity**2)/(2*kB*Te*11600))
+
+    # Усредненные значения
+    sigma_e_V_0 = trapezoid(maxvell*sigma_electron_0_vel, velocity)/trapezoid(maxvell, velocity)
+    sigma_e_V_1 = trapezoid(maxvell*sigma_electron_1_vel, velocity)/trapezoid(maxvell, velocity)
+    sigma_e_V_2 = trapezoid(maxvell*sigma_electron_2_vel, velocity)/trapezoid(maxvell, velocity)
+    sigma_e_V_4 = trapezoid(maxvell*sigma_electron_3_vel, velocity)/trapezoid(maxvell, velocity)
+    sigma_e_V_3 = trapezoid(maxvell*sigma_electron_4_vel, velocity)/trapezoid(maxvell, velocity)
+
+    return sigma_e_V_0, sigma_e_V_1, sigma_e_V_2, sigma_e_V_3, sigma_e_V_4
+# ==================================================================================================
 
 
 
