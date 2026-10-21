@@ -129,24 +129,23 @@ def section_treater():
 
     return mean_energy, mean_angle
 
-## Находим проекции скорости
-def calculate_velocity(mean_energy, mean_angle):
-            
-    speed = (2*mean_energy*qe/M)**0.5
-    
-    vx0 = speed*np.abs(np.cos(np.deg2rad(mean_angle)))
-    v_transverse = speed*np.abs(np.sin(np.deg2rad(mean_angle)))
-    return vx0, v_transverse
-
 ## Распределяем скорости по азимутальному углу
 # ==========================================================================
 # Генератор заданий
 def _velocity_projections(args):
-    i, j, N, v_transverse = args
+    i, j, N, mean_energy = args
+    vx0  = np.zeros(N)
     vy0 = np.zeros(N)
     vz0 = np.zeros(N)
+
+    # Модуль скорости
+    speed = (2*mean_energy*qe/M)**0.5
     
     for n in range(N):
+        phi = np.random.rand()*90
+        vx0[n] = speed*np.abs(np.cos(np.deg2rad(phi)))
+        v_transverse = speed*np.abs(np.sin(np.deg2rad(phi)))
+
         gamma = np.random.rand()*360
         if gamma >= 0 and gamma < 90:
             vy0[n] = v_transverse*np.abs(np.cos(np.deg2rad(gamma)))
@@ -161,9 +160,10 @@ def _velocity_projections(args):
             vy0[n] = v_transverse*np.abs(np.cos(np.deg2rad(gamma)))
             vz0[n] = v_transverse*np.abs(np.sin(np.deg2rad(gamma)))
     
-    return i, j, vy0, vz0
-# Органзатор
-def distribute_velocity_projections(la, lb, v_transverse):
+    return i, j, vx0, vy0, vz0
+
+# Организатор
+def distribute_velocity_projections(la, lb, mean_energy):
     print('Назначение исходных скоростей...')
     # Число потоков
     n_workers = os.cpu_count()
@@ -171,20 +171,21 @@ def distribute_velocity_projections(la, lb, v_transverse):
     tasks = []
     for i in range(len(la)):
         for j in range(len(lb)):
-            tasks.append((i, j, N, v_transverse))
-
+            tasks.append((i, j, N, mean_energy))
 
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
         results = list(executor.map(_velocity_projections, tasks))
-    
+
+    vel_x = np.zeros((len(la), len(lb), N))
     vel_y = np.zeros((len(la), len(lb), N))
     vel_z = np.zeros((len(la), len(lb), N))
     # распаковываем результат
-    for i, j, vy_slice, vz_slice in results:
+    for i, j, vx_slice, vy_slice, vz_slice in results:
+        vel_x[i, j, :] = vx_slice
         vel_y[i, j, :] = vy_slice
         vel_z[i, j, :] = vz_slice
 
-    return vel_y, vel_z
+    return vel_x, vel_y, vel_z
 
 # ==========================================================================
 # Скорости при диффузном отражении

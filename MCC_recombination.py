@@ -28,8 +28,6 @@ def run_MCC_atoms(filename):
 
     ## Назначаем частицам скорости и угол
     mean_energy, mean_angle = auxillary_recombination.section_treater()
-    # Проекции скорости
-    vx0, v_transverse = auxillary_recombination.calculate_velocity(mean_energy, mean_angle)
 
     # Удаляем файл на всякий случай, если он есьт
     if os.path.exists(f'MCC_traj_{recombination_probability}.h5'):
@@ -39,7 +37,8 @@ def run_MCC_atoms(filename):
         ## Распределеяем частицы в пределах одного сечения, в каждйю ячейку, параллельно
         y_cell, z_cell = auxillary_recombination.distribute_particles(a_grid, b_grid, N)
         # Назначаем скорости по азимутальному углу, тоже параллельно
-        vy0, vz0 = auxillary_recombination.distribute_velocity_projections(a_grid, b_grid, v_transverse)
+        vx0, vy0, vz0 = auxillary_recombination.distribute_velocity_projections(a_grid, b_grid, mean_energy)
+
         ## Запускаем частицы, получаем результаты для одного сечения
         time, particles_trajectoies, collisions_count, collision_points, is_recombined = trace_atoms_parallel.trace_atoms(L, l_grid[k], a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0, recombination_probability)
         # Все переменные выше имеют размерность:
@@ -145,11 +144,11 @@ if __name__ == '__main__':
     # ==============================================
     # === Атомы ===
     # Запуск расчета Монте-Карло для атомов
-    run_MCC_atoms(filename_atoms)
+    # run_MCC_atoms(filename_atoms)
 
     # Подсчет концентрации атомов с нормировкой
-    l_counter, sum_part, dt_regular, particle_count_initial = auxillary_recombination.calc_dens_atoms_in_time(filename_atoms)
-    exit()
+    # l_counter, sum_part, dt_regular, particle_count_initial = auxillary_recombination.calc_dens_atoms_in_time(filename_atoms)
+    
     # Сохранение полученных распределений в файл
     # h5py_atoms_concentration_saver('atoms_conc.h5', l_counter, sum_part, dt_regular, particle_count_initial)
     
@@ -282,7 +281,7 @@ if __name__ == '__main__':
             
         return solution
     solution = calculate_diffusion_flow(vars)
-    plt.plot(l_grid1, solution.y[:, -1]/10)
+    plt.plot(l_grid1, solution.y[:, -1]*(1 - 0.92))
     plt.plot(l_grid, concentration[0])
     plt.show()
 

@@ -132,7 +132,7 @@ def trace_atoms(L, lk, a_grid, b_grid, N, vx0, y_cell, vy0, z_cell, vz0, recombi
     print('== Трассировка атомов ==')
     print(f'Начата трассировка сечения {lk} м ...')
     n_workers = os.cpu_count()
-    t_max = L/vx0*100
+    t_max = L/np.mean(vx0)*300
     # print(t_max)
     # exit()
     tasks = []
